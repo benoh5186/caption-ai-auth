@@ -4,12 +4,14 @@ import uuid
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, HTTPException, Request
+import httpx
 
 
 class TranscribeRouter:
     def __init__(self) -> None:
         self.__router = APIRouter(prefix="/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
+        self.__transcribe_endpoint = "https://dummy.api/transcribe"  # Dummy endpoint for now.
         self.__s3_client = boto3.client(
             "s3",
             aws_access_key_id=os.getenv("AWS_S3_ACCESS_KEY"),
@@ -60,12 +62,27 @@ class TranscribeRouter:
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
 
-        return {
+        payload = {
             "video_id": video_id,
             "bucket": self.__bucket_name,
             "s3_key": s3_key,
-            "message": "Video uploaded successfully.",
         }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(self.__transcribe_endpoint, json=payload)
+                response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Transcribe endpoint returned an error: {exc.response.status_code}",
+            ) from exc
+        except (httpx.RequestError, ValueError) as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to parse transcribe endpoint response: {exc}",
+            ) from exc
 
     @staticmethod
     def __extension_from_content_type(content_type: str) -> str:
