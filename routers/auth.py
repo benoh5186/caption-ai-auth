@@ -98,10 +98,10 @@ class AuthUtility:
 
 
 class AuthRouter:
-    def __init__(self, mongo_db) -> None:
+    def __init__(self, mongo_db, auth_utility) -> None:
         self.__router = APIRouter(prefix="/auth", tags=["auth"])
         self.__users = mongo_db["users"]
-        self.__session_utility = AuthUtility()
+        self.__auth_utility = AuthUtility()
         self.__register_routes()
 
     def __register_routes(self) -> None:
@@ -110,6 +110,7 @@ class AuthRouter:
         self.__router.add_api_route("/dashboard", self.dashboard, methods=["GET"])
 
     async def signup(self, request: Request):
+        self.__auth_utility.enforce_rate_limit(max_requests=2, window_seconds=60, route_name="/signup")
         payload = await request.json()
         email = payload.get("email")
         password = payload.get("password")
@@ -130,15 +131,16 @@ class AuthRouter:
         insert_result = await self.__users.insert_one(user_doc)
         user_id = str(insert_result.inserted_id)
 
-        token = self.__session_utility.create_token(user_id=user_id, email=email)
+        token = self.__auth_utility.create_token(user_id=user_id, email=email)
         response = JSONResponse(
             status_code=201,
             content={"message": "Signup successful.", "user_id": user_id},
         )
-        self.__session_utility.set_session_cookie(response, token)
+        self.__auth_utility.set_session_cookie(response, token)
         return response
 
     async def login(self, request: Request):
+        self.__auth_utility.enforce_rate_limit(max_requests=6, window_seconds=60, route_name="/login")
         payload = await request.json()
         email = payload.get("email")
         password = payload.get("password")
@@ -155,13 +157,14 @@ class AuthRouter:
             raise HTTPException(status_code=401, detail="Invalid email or password.")
 
         user_id = str(user["_id"])
-        token = self.__session_utility.create_token(user_id=user_id, email=email)
+        token = self.__auth_utility.create_token(user_id=user_id, email=email)
         response = JSONResponse(content={"message": "Login successful."})
-        self.__session_utility.set_session_cookie(response, token)
+        self.__auth_utility.set_session_cookie(response, token)
         return response
 
     async def dashboard(self, request: Request):
-        session_payload = self.__session_utility.require_session(request)
+        self.__auth_utility.enforce_rate_limit(max_requests=60, window_seconds=60, route_name="/dashboard")
+        session_payload = self.__auth_utility.require_session(request)
         return {
             "message": "Dashboard access granted.",
             "user": {
