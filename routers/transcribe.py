@@ -5,13 +5,16 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, HTTPException, Request
 import httpx
+from motor.motor_asyncio import AsyncIOMotorClient
+
 
 
 class TranscribeRouter:
-    def __init__(self) -> None:
+    def __init__(self, mongo_db) -> None:
         self.__router = APIRouter(prefix="/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
         self.__transcribe_endpoint = "https://dummy.api/transcribe"  # Dummy endpoint for now.
+        self.__download_endpoint = "https://dummy.api/download"
         self.__s3_client = boto3.client(
             "s3",
             aws_access_key_id=os.getenv("AWS_S3_ACCESS_KEY"),
@@ -19,6 +22,7 @@ class TranscribeRouter:
             region_name=os.getenv("AWS_REGION"),
         )
         self.__register_routes()
+        self.__user_session_metadata = mongo_db["user_session_metadata"]
 
     def __register_routes(self) -> None:
         self.__router.add_api_route(
@@ -26,6 +30,11 @@ class TranscribeRouter:
             self.transcribe,
             methods=["POST"],
         )
+
+    async def download(self, request: Request):
+
+
+        pass 
 
     async def transcribe(self, request: Request):
         if not self.__bucket_name:
@@ -42,6 +51,7 @@ class TranscribeRouter:
         if not video_bytes:
             raise HTTPException(status_code=400, detail="Request body is empty.")
 
+        # Will need to put this video id into nosql data collection 
         video_id = str(uuid.uuid4())
         extension = self.__extension_from_content_type(content_type)
         if extension == "bin":
@@ -61,6 +71,13 @@ class TranscribeRouter:
             )
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
+        
+        self.__user_session_metadata.insert_one(
+            {
+                "video_id" : video_id,
+                "s3_key" : s3_key
+            }
+        )
 
         payload = {
             "video_id": video_id,
