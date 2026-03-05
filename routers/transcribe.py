@@ -10,7 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 
 class TranscribeRouter:
-    def __init__(self, mongo_db) -> None:
+    def __init__(self, mongo_db, auth_utility) -> None:
         self.__router = APIRouter(prefix="/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
         self.__transcribe_endpoint = "https://dummy.api/transcribe"  # Dummy endpoint for now.
@@ -23,6 +23,7 @@ class TranscribeRouter:
         )
         self.__register_routes()
         self.__user_session_metadata = mongo_db["user_session_metadata"]
+        self.__auth_utility = auth_utility
 
     def __register_routes(self) -> None:
         self.__router.add_api_route(
@@ -32,11 +33,14 @@ class TranscribeRouter:
         )
 
     async def download(self, request: Request):
+        self.__auth_utility.enforce_rate_limit(max_requests=1, window_seconds=30, route_name="/download")
+
 
 
         pass 
 
     async def transcribe(self, request: Request):
+        self.__auth_utility.enforce_rate_limit(max_requests=2, window_seconds=60, route_name="/transcribe")
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
 
