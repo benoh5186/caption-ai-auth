@@ -15,7 +15,7 @@ from schemas.user import UserAlreadyExistsError, UserCreate, UserLogin
 class AuthUtility:
     def __init__(self) -> None:
         self._secret = os.getenv("JWT_SECRET_KEY")
-        self._algorithm = os.getenv("JWT_ALGORITHM", "HS256")
+        self._algorithm = os.getenv("JWT_ALGORITHM")
         self._cookie_name = "session_token"
         self._session_minutes = 5
         self._requests = defaultdict(deque)
