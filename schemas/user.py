@@ -50,3 +50,14 @@ class UserSchema(BaseModel):
 
     deleted_at: Optional[datetime] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=3)
+
+
+class UserAlreadyExistsError(Exception):
+    def __init__(self, email: str) -> None:
+        super().__init__(f"User with email '{email}' already exists.")
+        self.email = email
