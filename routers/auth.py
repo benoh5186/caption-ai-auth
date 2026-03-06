@@ -8,6 +8,9 @@ import jwt
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from db.db import Database
+from schemas.user import UserAlreadyExistsError, UserCreate, UserLogin
+
 
 class AuthUtility:
     def __init__(self) -> None:
@@ -57,11 +60,11 @@ class AuthUtility:
         
     def __allow_request(self, key: str, max_requests: int, window_seconds: int) -> tuple[bool, int]:
         now = time.time()
-        window_seconds = window_seconds - now 
+        window_start = now - window_seconds
         times = self._requests[key]
-        while times and times[0] <= window_seconds:
+        while times and times[0] <= window_start:
             times.popleft()
-        if len(times) > max_requests:
+        if len(times) >= max_requests:
             wait_time = max(1, int(times[0] + window_seconds - now))
             return False, wait_time
         times.append(now)
@@ -70,10 +73,11 @@ class AuthUtility:
 
     def enforce_rate_limit(
             self,  
+            request: Request,
             max_requests: int, 
             window_seconds: int, 
             route_name: str):
-        client = self.__client_identifier()
+        client = self.__client_identifier(request)
         key = f"{route_name}: {client}"
         allowed, wait_time = self.__allow_request(key=key, max_requests=max_requests, window_seconds=window_seconds)
         if not allowed:
@@ -98,9 +102,9 @@ class AuthUtility:
 
 
 class AuthRouter:
-    def __init__(self, mongo_db, auth_utility) -> None:
+    def __init__(self, user: Database) -> None:
         self.__router = APIRouter(prefix="/auth", tags=["auth"])
-        self.__users = mongo_db["users"]
+        self.__user = user
         self.__auth_utility = AuthUtility()
         self.__register_routes()
 
@@ -110,60 +114,62 @@ class AuthRouter:
         self.__router.add_api_route("/dashboard", self.dashboard, methods=["GET"])
 
     async def signup(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(max_requests=2, window_seconds=60, route_name="/signup")
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=2,
+            window_seconds=60,
+            route_name="/signup",
+        )
         payload = await request.json()
-        email = payload.get("email")
-        password = payload.get("password")
+        login = UserLogin.model_validate(payload)
+        user_create = UserCreate(
+            email=login.email,
+            password_hash=self.__hash_password(login.password),
+        )
 
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="email and password are required.")
+        try:
+            created_user = self.__user.create_user(user_create)
+        except UserAlreadyExistsError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-        existing_user = await self.__users.find_one({"email": email})
-        if existing_user:
-            raise HTTPException(status_code=409, detail="User already exists.")
-
-        password_hash = self.__hash_password(password)
-        user_doc = {
-            "email": email,
-            "password_hash": password_hash,
-            "created_at": datetime.now(timezone.utc),
-        }
-        insert_result = await self.__users.insert_one(user_doc)
-        user_id = str(insert_result.inserted_id)
-
-        token = self.__auth_utility.create_token(user_id=user_id, email=email)
+        token = self.__auth_utility.create_token(
+            user_id=created_user.id,
+            email=str(created_user.email),
+        )
         response = JSONResponse(
             status_code=201,
-            content={"message": "Signup successful.", "user_id": user_id},
+            content={"message": "Signup successful.", "user_id": created_user.id},
         )
         self.__auth_utility.set_session_cookie(response, token)
         return response
 
     async def login(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(max_requests=6, window_seconds=60, route_name="/login")
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=6,
+            window_seconds=60,
+            route_name="/login",
+        )
         payload = await request.json()
-        email = payload.get("email")
-        password = payload.get("password")
-
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="email and password are required.")
-
-        user = await self.__users.find_one({"email": email})
+        login = UserLogin.model_validate(payload)
+        password_hash = self.__hash_password(login.password)
+        user = self.__user.authenticate_user(login, password_hash)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid email or password.")
 
-        password_hash = self.__hash_password(password)
-        if user.get("password_hash") != password_hash:
-            raise HTTPException(status_code=401, detail="Invalid email or password.")
-
-        user_id = str(user["_id"])
-        token = self.__auth_utility.create_token(user_id=user_id, email=email)
+        self.__user.update_last_login(user.id)
+        token = self.__auth_utility.create_token(user_id=user.id, email=str(user.email))
         response = JSONResponse(content={"message": "Login successful."})
         self.__auth_utility.set_session_cookie(response, token)
         return response
 
     async def dashboard(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(max_requests=60, window_seconds=60, route_name="/dashboard")
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=60,
+            window_seconds=60,
+            route_name="/dashboard",
+        )
         session_payload = self.__auth_utility.require_session(request)
         return {
             "message": "Dashboard access granted.",
