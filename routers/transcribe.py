@@ -34,13 +34,12 @@ class TranscribeRouter:
 
     async def download(self, request: Request):
         self.__auth_utility.enforce_rate_limit(max_requests=1, window_seconds=30, route_name="/download")
-
-
-
+        self.__auth_utility.require_session(request)
         pass 
 
     async def transcribe(self, request: Request):
         self.__auth_utility.enforce_rate_limit(max_requests=2, window_seconds=60, route_name="/transcribe")
+        self.__auth_utility.require_session(request)
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
 
