@@ -1,5 +1,6 @@
 import os
 import uuid
+from urllib.parse import quote
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -35,23 +36,45 @@ class TranscribeRouter:
             self.transcribe,
             methods=["POST"],
         )
+        self.__router.add_api_route(
+            "/download/{video_id}",
+            self.download,
+            methods=["GET"],
+        )
+        self.__router.add_api_route(
+            "/save-session",
+            self.save_session,
+            methods=["POST"],
+        )
 
-    async def download(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(max_requests=1, window_seconds=30, route_name="/download")
+    async def download(self, video_id: str, request: Request):
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=1,
+            window_seconds=30,
+            route_name="/download",
+        )
         session_payload = self.__auth_utility.require_session(request)
-        try:
-            session_info = await request.json()
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid JSON payload.") from exc
-        if not isinstance(session_info, dict):
-            raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
-        session_mongodb: dict = await self.__user_session_metadata.find_one({"user_id" : session_payload.get("sub")})
-        session_metadata = session_mongodb.get("session_info")
+
+        session_mongodb = await self.__user_session_metadata.find_one(
+            {
+                "user_id": session_payload.get("sub"),
+                "video_id": video_id,
+            }
+        )
+        if not session_mongodb:
+            raise HTTPException(status_code=404, detail="Video metadata not found.")
+
+        session_metadata = session_mongodb.get("session_info", {})
+        s3_key = session_mongodb.get("s3_key")
+        if not s3_key:
+            raise HTTPException(status_code=404, detail="Video storage key not found.")
+
         payload = {
-            "video_id" : session_mongodb.get("video_id"),
-            "s3_key" : session_mongodb.get("s3_key"),
-            "s3_burned_video_bucket" : self.__burned_video,
-            "video_metadata" : session_metadata
+            "video_id": session_mongodb.get("video_id"),
+            "s3_key": session_mongodb.get("s3_key"),
+            "s3_burned_video_bucket": self.__burned_video,
+            "video_metadata": session_metadata,
         }
         try:
             async with httpx.AsyncClient() as client:
@@ -71,14 +94,17 @@ class TranscribeRouter:
         try:
             s3_object = self.__s3_client.get_object(
                 Bucket=self.__burned_video,
-                Key=session_mongodb.get("s3_key"),
+                Key=s3_key,
             )
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 download failed: {exc}") from exc
+
+        content_type = s3_object.get("ContentType") or "video/mp4"
+        filename = quote(os.path.basename(s3_key))
         return StreamingResponse(
             self.__iter_video(s3_object["Body"]),
-            media_type="video/mp4",
-            headers={"Content-Disposition": 'inline; filename="video.mp4"'},
+            media_type=content_type,
+            headers={"Content-Disposition": f'inline; filename="{filename}"'},
         )
 
         
@@ -87,7 +113,12 @@ class TranscribeRouter:
  
 
     async def save_session(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(max_requests=1, window_seconds=30, route_name="/save-session")
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=1,
+            window_seconds=30,
+            route_name="/save-session",
+        )
         session_payload = self.__auth_utility.require_session(request)
         try:
             session_info = await request.json()
@@ -98,6 +129,7 @@ class TranscribeRouter:
             raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
 
         insert_payload = {
+            "user_id": session_payload.get("sub"),
             "email": session_payload.get("email"),
             "session_info": session_info,
         }
@@ -111,7 +143,12 @@ class TranscribeRouter:
 
 
     async def transcribe(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(max_requests=2, window_seconds=60, route_name="/transcribe")
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=2,
+            window_seconds=60,
+            route_name="/transcribe",
+        )
         payload = self.__auth_utility.require_session(request)
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
@@ -148,11 +185,11 @@ class TranscribeRouter:
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
         
-        self.__user_session_metadata.insert_one(
+        await self.__user_session_metadata.insert_one(
             {
-                "user_id" : payload.get("sub"),
-                "video_id" : video_id,
-                "s3_key" : s3_key
+                "user_id": payload.get("sub"),
+                "video_id": video_id,
+                "s3_key": s3_key,
             }
         )
 
