@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 import httpx
 from motor.motor_asyncio import AsyncIOMotorClient
 from routers.auth import AuthUtility
+from fastapi.responses import StreamingResponse
 
 
 
@@ -37,14 +38,49 @@ class TranscribeRouter:
 
     async def download(self, request: Request):
         self.__auth_utility.enforce_rate_limit(max_requests=1, window_seconds=30, route_name="/download")
-        payload = self.__auth_utility.require_session(request)
+        session_payload = self.__auth_utility.require_session(request)
         try:
             session_info = await request.json()
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid JSON payload.") from exc
         if not isinstance(session_info, dict):
             raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
-        session_metadata = await self.__user_session_metadata.find_one({payload.get("sub")})
+        session_mongodb: dict = await self.__user_session_metadata.find_one({"user_id" : session_payload.get("sub")})
+        session_metadata = session_mongodb.get("session_info")
+        payload = {
+            "video_id" : session_mongodb.get("video_id"),
+            "s3_key" : session_mongodb.get("s3_key"),
+            "s3_burned_video_bucket" : self.__burned_video,
+            "video_metadata" : session_metadata
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(self.__download_endpoint, json=payload)
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Download endpoint returned an error: {exc.response.status_code}",
+            ) from exc
+        except (httpx.RequestError, ValueError) as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to parse download endpoint response: {exc}",
+            ) from exc
+        
+        try:
+            s3_object = self.__s3_client.get_object(
+                Bucket=self.__burned_video,
+                Key=session_mongodb.get("s3_key"),
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise HTTPException(status_code=502, detail=f"S3 download failed: {exc}") from exc
+        return StreamingResponse(
+            self.__iter_video(s3_object["Body"]),
+            media_type="video/mp4",
+            headers={"Content-Disposition": 'inline; filename="video.mp4"'},
+        )
+
         
 
 
@@ -62,7 +98,6 @@ class TranscribeRouter:
             raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
 
         insert_payload = {
-            "user_id": session_payload.get("sub"),
             "email": session_payload.get("email"),
             "session_info": session_info,
         }
@@ -154,3 +189,8 @@ class TranscribeRouter:
     @property
     def router(self) -> APIRouter:
         return self.__router
+    
+    @staticmethod
+    def __iter_video(streaming_body, chunk_size: int = 1024 * 1024):
+        while chunk := streaming_body.read(chunk_size):
+            yield chunk
