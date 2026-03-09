@@ -15,6 +15,7 @@ class TranscribeRouter:
     def __init__(self, mongo_db: AsyncIOMotorClient, auth_utility: AuthUtility) -> None:
         self.__router = APIRouter(prefix="/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
+        self.__burned_video = os.getenv("S3_BURNED_VIDEO")
         self.__transcribe_endpoint = "https://dummy.api/transcribe"  # Dummy endpoint for now.
         self.__download_endpoint = "https://dummy.api/download"
         self.__s3_client = boto3.client(
@@ -36,7 +37,17 @@ class TranscribeRouter:
 
     async def download(self, request: Request):
         self.__auth_utility.enforce_rate_limit(max_requests=1, window_seconds=30, route_name="/download")
-        self.__auth_utility.require_session(request)
+        payload = self.__auth_utility.require_session(request)
+        try:
+            session_info = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload.") from exc
+        if not isinstance(session_info, dict):
+            raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
+        session_metadata = await self.__user_session_metadata.find_one({payload.get("sub")})
+        
+
+
  
 
     async def save_session(self, request: Request):
@@ -66,7 +77,7 @@ class TranscribeRouter:
 
     async def transcribe(self, request: Request):
         self.__auth_utility.enforce_rate_limit(max_requests=2, window_seconds=60, route_name="/transcribe")
-        self.__auth_utility.require_session(request)
+        payload = self.__auth_utility.require_session(request)
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
 
@@ -104,6 +115,7 @@ class TranscribeRouter:
         
         self.__user_session_metadata.insert_one(
             {
+                "user_id" : payload.get("sub"),
                 "video_id" : video_id,
                 "s3_key" : s3_key
             }
