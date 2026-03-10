@@ -203,7 +203,11 @@ class TranscribeRouter:
             async with httpx.AsyncClient() as client:
                 response = await client.post(self.__transcribe_endpoint, json=payload)
                 response.raise_for_status()
-            return response.json()
+                transcript = response.json()
+                await self.__user_session_metadata.insert_one(
+                    {"transcript" : transcript}
+                )
+            return transcript
         except httpx.HTTPStatusError as exc:
             raise HTTPException(
                 status_code=502,
