@@ -75,8 +75,9 @@ class TranscribeRouter:
             "s3_key": session_mongodb.get("s3_key"),
             "s3_burned_video_bucket": self.__burned_video,
             "video_metadata": session_metadata,
+            "transcript" : session_mongodb.get("transcript")
         }
-        try:
+        try: 
             async with httpx.AsyncClient() as client:
                 response = await client.post(self.__download_endpoint, json=payload)
                 response.raise_for_status()
@@ -129,11 +130,11 @@ class TranscribeRouter:
             raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
 
         insert_payload = {
-            "user_id": session_payload.get("sub"),
-            "email": session_payload.get("email"),
             "session_info": session_info,
         }
-        result = await self.__user_session_metadata.insert_one(insert_payload)
+        result = await self.__user_session_metadata.update_one(
+            {"user_id": session_payload.get("sub")},
+            {"$set":insert_payload})
         return {
             "message": "Session saved successfully.",
             "session_id": str(result.inserted_id),
@@ -204,8 +205,9 @@ class TranscribeRouter:
                 response = await client.post(self.__transcribe_endpoint, json=payload)
                 response.raise_for_status()
                 transcript = response.json()
-                await self.__user_session_metadata.insert_one(
-                    {"transcript" : transcript}
+                await self.__user_session_metadata.update_one(
+                    {"user_id" : transcript},
+                    {"$set": {"transcript": transcript}}
                 )
             return transcript
         except httpx.HTTPStatusError as exc:
