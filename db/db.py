@@ -240,6 +240,18 @@ class Database:
         affected = self.__execute_query(query, (now, user_id))
         return affected > 0
     
+    def decrease_sessions_creation_count(self, user_id: str) -> bool:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        query = """
+            UPDATE user_sessions_count
+            SET
+            session_count = session_count - 1,
+            updated_at = %s
+            WHERE user_id = %s
+        """
+        affected = self.__execute_query(query, (now, user_id))
+        return affected > 0 
+    
     def __get_sessions_count(self, user_id: str) -> int:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         insert_query = """
