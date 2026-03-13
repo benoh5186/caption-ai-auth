@@ -108,40 +108,6 @@ class TranscribeRouter:
             headers={"Content-Disposition": f'inline; filename="{filename}"'},
         )
 
-        
-
-
- 
-
-    async def save_session(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=1,
-            window_seconds=30,
-            route_name="/save-session",
-        )
-        session_payload = self.__auth_utility.require_session(request)
-        try:
-            session_info = await request.json()
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid JSON payload.") from exc
-
-        if not isinstance(session_info, dict):
-            raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
-
-        insert_payload = {
-            "session_info": session_info,
-        }
-        result = await self.__user_session_metadata.update_one(
-            {"user_id": session_payload.get("sub")},
-            {"$set":insert_payload})
-        return {
-            "message": "Session saved successfully.",
-            "session_id": str(result.inserted_id),
-        }
-
-
-
 
     async def transcribe(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
