@@ -9,5 +9,16 @@ class SessionRouter:
         self.__user = user_sessions
         self.__auth_utility = auth_utility
         self.__user_session_metadata = mongo_db["user_session_metadata"]
+
+    def load_sessions(self):
+        pass
+
+    def load_session(self):
+        pass
+    def create_session(self):
+        pass
+    def delete_session(self):
+    
+    
         
         
