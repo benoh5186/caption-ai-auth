@@ -223,6 +223,43 @@ class Database:
             (deleted_at_value, UserStatus.DELETED.value, now, user_id),
         )
         return affected > 0
+    
+    def increase_sessions_creation_count(self, user_id: str) -> bool:
+        max_sessions = 10
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        session_count = self.__get_sessions_count(user_id)
+        if session_count == max_sessions:
+            raise Exception()
+        query = """
+            UPDATE user_sessions_count
+            SET
+            session_count = session_count + 1,
+            updated_at = %s
+            WHERE user_id = %s
+        """
+        affected = self.__execute_query(query, (now, user_id))
+        return affected > 0
+    
+    def __get_sessions_count(self, user_id: str) -> int:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        insert_query = """
+            INSERT INTO user_sessions_count (user_id, session_count, created_at, updated_at)
+            VALUES (%s, 0, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                updated_at = updated_at
+        """
+        self.__execute_query(insert_query, (user_id, now, now))
+
+        query = """
+            SELECT session_count
+            FROM user_sessions_count
+            WHERE user_id = %s
+            LIMIT 1
+        """
+        row = self.__fetch_one(query, (user_id,))
+        if row is None:
+            raise RuntimeError(f"Failed to load session count for user_id={user_id}")
+        return int(row.get("session_count", 0))
 
     def list_users(
         self,
