@@ -102,10 +102,10 @@ class AuthUtility:
 
 
 class AuthRouter:
-    def __init__(self, user: Database) -> None:
+    def __init__(self, user: Database, auth_utility: AuthUtility) -> None:
         self.__router = APIRouter(prefix="/auth", tags=["auth"])
         self.__user = user
-        self.__auth_utility = AuthUtility()
+        self.__auth_utility = auth_utility
         self.__register_routes()
 
     def __register_routes(self) -> None:
