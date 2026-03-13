@@ -105,7 +105,7 @@ class TranscribeRouter:
         return StreamingResponse(
             self.__iter_video(s3_object["Body"]),
             media_type=content_type,
-            headers={"Content-Disposition": f'inline; filename="{filename}"'},
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
 
