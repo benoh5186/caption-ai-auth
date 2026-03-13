@@ -37,14 +37,14 @@ class SessionRouter:
             raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
 
         insert_payload = {
-            "session_info": session_info,
+            "session_info": session_info["video_metadata"],
         }
-        result = await self.__user_session_metadata.update_one(
-            {"user_id": session_payload.get("sub")},
+        await self.__user_session_metadata.update_one(
+            {"user_id": session_payload.get("sub"),
+             "session_id": session_info["session_id"]},
             {"$set":insert_payload})
         return {
-            "message": "Session saved successfully.",
-            "session_id": str(result.inserted_id),
+            "message": "Session saved successfully."
         }
 
         
