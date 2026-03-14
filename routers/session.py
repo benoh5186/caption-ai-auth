@@ -23,7 +23,13 @@ class SessionRouter:
         )
 
     async def load_sessions(self, request: Request):
-        pass
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=10,
+            window_seconds=30,
+            route_name="/load-sessions",
+        )
+        session_payload = self.__auth_utility.require_session(request)
 
     async def load_session(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
