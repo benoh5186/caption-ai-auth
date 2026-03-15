@@ -96,7 +96,19 @@ class SessionRouter:
 
     
     async def delete_session(self, request: Request):
-        pass
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=1,
+            window_seconds=5,
+            route_name="/delete-session",
+        )
+        session_payload = self.__auth_utility.require_session(request)
+        self.__user.decrease_sessions_creation_count(session_payload.get("sub"))
+        return JSONResponse(
+            status_code=201,
+            content={"message" : "session deletion successful"}
+        )
+
 
     async def save_session(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
