@@ -151,6 +151,12 @@ class TranscribeRouter:
             )
         s3_key = f"videos/{video_id}.{extension}"
 
+        session_doc = await self.__user_session_metadata.find_one(
+         {"user_id": session_payload.get("sub"), "session_id": session_id}
+         )
+        if not session_doc:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        
         try:
             self.__s3_client.put_object(
                 Bucket=self.__bucket_name,
@@ -165,11 +171,7 @@ class TranscribeRouter:
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
         
-        session_doc = await self.__user_session_metadata.find_one(
-         {"user_id": session_payload.get("sub"), "session_id": session_id}
-         )
-        if not session_doc:
-            raise HTTPException(status_code=404, detail="Session not found.")
+
         
         await self.__user_session_metadata.update_one(
             {"user_id" : payload.get("sub"),
