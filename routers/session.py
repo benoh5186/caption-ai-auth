@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from urllib.parse import quote
 import uuid
 
@@ -87,6 +87,10 @@ class SessionRouter:
                 "user_id" : session_payload.get("sub"),
                 "session_id" : session_id
             })
+            return JSONResponse(
+            status_code=201,
+            content={ "session_id" : session_id},
+            )
         except:
             raise HTTPException(status_code=403, detail="can't create anymore sessions")
 
