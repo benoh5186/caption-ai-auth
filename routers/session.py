@@ -31,6 +31,13 @@ class SessionRouter:
             route_name="/load-sessions",
         )
         session_payload = self.__auth_utility.require_session(request)
+        cursor = self.__user_session_metadata.find({
+            {"user_id" : session_payload.get("sub")},
+            {"_id": 0},
+            })
+        sessions = await cursor.to_list(length=100)
+        return sessions 
+
 
     async def load_session(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
@@ -44,7 +51,8 @@ class SessionRouter:
             {
                 "user_id": session_payload.get("sub"),
                 "session_id": request.query_params.get("session_id")
-            }
+            },
+            {"_id": 0},
         )
     async def load_session_video(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
