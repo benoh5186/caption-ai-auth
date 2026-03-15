@@ -83,7 +83,10 @@ class SessionRouter:
         session_id = str(uuid.uuid4())
         try:
             self.__user.increase_sessions_creation_count(session_payload["sub"])
-            self.__user_session_metadata
+            self.__user_session_metadata.insert_one({
+                "user_id" : session_payload.get("sub"),
+                "session_id" : session_id
+            })
         except:
             raise HTTPException(status_code=403, detail="can't create anymore sessions")
 
