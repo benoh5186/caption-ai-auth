@@ -167,7 +167,7 @@ class TranscribeRouter:
               }   
         )
 
-        payload = {
+        session_payload = {
             "video_id": video_id,
             "bucket": self.__bucket_name,
             "s3_key": s3_key,
@@ -175,7 +175,7 @@ class TranscribeRouter:
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(self.__transcribe_endpoint, json=payload)
+                response = await client.post(self.__transcribe_endpoint, json=session_payload)
                 response.raise_for_status()
                 transcript = response.json()
                 await self.__user_session_metadata.update_one(
