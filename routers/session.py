@@ -150,5 +150,9 @@ class SessionRouter:
         while chunk := streaming_body.read(chunk_size):
             yield chunk
 
+    @property
+    def router(self) -> APIRouter:
+        return self.__router
+
         
         
