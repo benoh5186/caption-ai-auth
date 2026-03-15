@@ -134,8 +134,15 @@ class TranscribeRouter:
 
         # Will need to put this video id into nosql data collection 
         video_id = str(uuid.uuid4())
-        metadata_dict = json.loads(metadata)
+        try: 
+            metadata_dict = json.loads(metadata)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="metadata must be valid JSON")
+        if not isinstance(metadata_dict, dict):
+            raise HTTPException(status_code=400, detail="metadata must be JSON object")
         session_id = metadata_dict.get("session_id")
+        if not session_id or not isinstance(session_id, str):
+            raise HTTPException(status_code=400, detail="session_id is required.")
         extension = self.__extension_from_content_type(content_type)
         if extension == "bin":
             raise HTTPException(
@@ -157,6 +164,12 @@ class TranscribeRouter:
             )
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
+        
+        session_doc = await self.__user_session_metadata.find_one(
+         {"user_id": session_payload.get("sub"), "session_id": session_id}
+         )
+        if not session_doc:
+            raise HTTPException(status_code=404, detail="Session not found.")
         
         await self.__user_session_metadata.update_one(
             {"user_id" : payload.get("sub"),
