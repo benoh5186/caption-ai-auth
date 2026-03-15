@@ -171,17 +171,6 @@ class TranscribeRouter:
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
         
-
-        
-        await self.__user_session_metadata.update_one(
-            {"user_id" : payload.get("sub"),
-             "session_id" : session_id},
-            {"$set" : {
-                "video_id": video_id,
-                "s3_key": s3_key,}
-              }   
-        )
-
         session_payload = {
             "video_id": video_id,
             "bucket": self.__bucket_name,
@@ -197,7 +186,10 @@ class TranscribeRouter:
                     {"user_id" : payload["sub"],
                      "session_id" : session_id
                      },
-                    {"$set": {"transcript": transcript}}
+                    {"$set": {
+                        "video_id": video_id,
+                        "s3_key": s3_key,
+                        "transcript": transcript}}
                 )
             return transcript
         except httpx.HTTPStatusError as exc:
