@@ -4,11 +4,12 @@ from urllib.parse import quote
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
 import httpx
 from motor.motor_asyncio import AsyncIOMotorClient
 from routers.auth import AuthUtility
 from fastapi.responses import StreamingResponse
+import json
 
 
 
@@ -109,7 +110,7 @@ class TranscribeRouter:
         )
 
 
-    async def transcribe(self, request: Request):
+    async def transcribe(self, request: Request, video: UploadFile = File(...), metadata: str = Form(...)):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=2,
@@ -120,19 +121,21 @@ class TranscribeRouter:
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
 
-        content_type = request.headers.get("content-type", "")
+        content_type = video.headers.get("content-type", "")
         if not content_type.startswith("video/"):
             raise HTTPException(
                 status_code=415,
                 detail="Unsupported media type. Expected video/* content type.",
             )
 
-        video_bytes = await request.body()
+        video_bytes = await video.read()
         if not video_bytes:
             raise HTTPException(status_code=400, detail="Request body is empty.")
 
         # Will need to put this video id into nosql data collection 
         video_id = str(uuid.uuid4())
+        metadata_dict = json.loads(metadata)
+        session_id = metadata_dict.get("session_id")
         extension = self.__extension_from_content_type(content_type)
         if extension == "bin":
             raise HTTPException(
@@ -147,17 +150,21 @@ class TranscribeRouter:
                 Key=s3_key,
                 Body=video_bytes,
                 ContentType=content_type,
-                Metadata={"video_id": video_id},
+                Metadata={
+                    "video_id": video_id,
+                    "session_id" : session_id
+                          },
             )
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
         
-        await self.__user_session_metadata.insert_one(
-            {
-                "user_id": payload.get("sub"),
+        await self.__user_session_metadata.update_one(
+            {"user_id" : payload.get("sub"),
+             "session_id" : session_id},
+            {"$set" : {
                 "video_id": video_id,
-                "s3_key": s3_key,
-            }
+                "s3_key": s3_key,}
+              }   
         )
 
         payload = {
@@ -172,7 +179,9 @@ class TranscribeRouter:
                 response.raise_for_status()
                 transcript = response.json()
                 await self.__user_session_metadata.update_one(
-                    {"user_id" : transcript},
+                    {"user_id" : payload["sub"],
+                     "session_id" : session_id
+                     },
                     {"$set": {"transcript": transcript}}
                 )
             return transcript
