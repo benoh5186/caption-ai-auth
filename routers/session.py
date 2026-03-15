@@ -7,6 +7,7 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi.responses import StreamingResponse
 from urllib.parse import quote
+import uuid
 
 class SessionRouter:
     def __init__(self, user_sessions: Database, mongo_db: AsyncIOMotorClient,auth_utility: AuthUtility):
@@ -72,7 +73,21 @@ class SessionRouter:
 
 
     async def create_session(self, request: Request):
-        pass
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=1,
+            window_seconds=5,
+            route_name="/create-session",
+        )
+        session_payload = self.__auth_utility.require_session(request)
+        session_id = str(uuid.uuid4())
+        try:
+            self.__user.increase_sessions_creation_count(session_payload["sub"])
+            self.__user_session_metadata
+        except:
+            raise HTTPException(status_code=403, detail="can't create anymore sessions")
+
+    
     async def delete_session(self, request: Request):
         pass
 
