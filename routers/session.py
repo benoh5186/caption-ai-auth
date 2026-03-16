@@ -23,6 +23,38 @@ class SessionRouter:
             region_name=os.getenv("AWS_REGION"),
         )
 
+    def __register_routes(self):
+        self.__router.add_api_route(
+            "/load-sessions",
+            self.load_sessions,
+            methods=["GET"]
+        )
+        self.__router.add_api_route(
+            "/load-session",
+            self.load_session,
+            methods=["GET"]
+        )
+        self.__router.add_api_route(
+            "load-session-video",
+            self.load_session_video,
+            methods=["POST"]
+        )
+        self.__router.add_api_route(
+            "create-session",
+            self.create_session,
+            methods=["GET"]
+        )
+        self.__router.add_api_route(
+            "delete-session/{session_id}",
+            self.delete_session,
+            methods=["DELETE"]
+        )
+        self.__router.add_api_route(
+            "save-session",
+            self.save_session,
+            methods=["POST"]
+        )
+
     async def load_sessions(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
             request=request,
@@ -77,9 +109,6 @@ class SessionRouter:
             headers={"Content-Disposition": f'inline; filename={filename}'},
         )       
 
-
-
-
     async def create_session(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
             request=request,
@@ -111,6 +140,7 @@ class SessionRouter:
             route_name="/delete-session",
         )
         session_payload = self.__auth_utility.require_session(request)
+
         self.__user.decrease_sessions_creation_count(session_payload.get("sub"))
         return JSONResponse(
             status_code=201,
