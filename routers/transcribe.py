@@ -42,11 +42,6 @@ class TranscribeRouter:
             self.download,
             methods=["GET"],
         )
-        self.__router.add_api_route(
-            "/save-session",
-            self.save_session,
-            methods=["POST"],
-        )
 
     async def download(self, video_id: str, request: Request):
         self.__auth_utility.enforce_rate_limit(
