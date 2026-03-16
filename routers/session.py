@@ -140,7 +140,11 @@ class SessionRouter:
             route_name="/delete-session",
         )
         session_payload = self.__auth_utility.require_session(request)
-
+        session_id = request.query_params.get("session_id")
+        await self.__user_session_metadata.delete_one({
+            "user_id" : session_payload.get("sub"),
+            "session_id" : session_id
+        })
         self.__user.decrease_sessions_creation_count(session_payload.get("sub"))
         return JSONResponse(
             status_code=201,
