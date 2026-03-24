@@ -122,7 +122,9 @@ class SessionRouter:
             self.__user.increase_sessions_creation_count(session_payload["sub"])
             self.__user_session_metadata.insert_one({
                 "user_id" : session_payload.get("sub"),
-                "session_id" : session_id
+                "session_id" : session_id,
+                "transcript" : None,
+                "session_info" : None
             })
             return JSONResponse(
             status_code=201,
@@ -174,7 +176,7 @@ class SessionRouter:
         await self.__user_session_metadata.update_one(
             {"user_id": session_payload.get("sub"),
              "session_id": session_info["session_id"]},
-            {"$set":insert_payload})
+            {"$set": insert_payload})
         return {
             "message": "Session saved successfully."
         }
