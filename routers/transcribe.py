@@ -105,7 +105,7 @@ class TranscribeRouter:
         )
 
 
-    async def transcribe(self, request: Request, video: UploadFile = File(...), metadata: str = Form(...)):
+    async def transcribe(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=2,
@@ -113,63 +113,14 @@ class TranscribeRouter:
             route_name="/transcribe",
         )
         payload = self.__auth_utility.require_session(request)
+        request_payload = await request.json()
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
-
-        content_type = video.headers.get("content-type", "")
-        if not content_type.startswith("video/"):
-            raise HTTPException(
-                status_code=415,
-                detail="Unsupported media type. Expected video/* content type.",
-            )
-
-        video_bytes = await video.read()
-        if not video_bytes:
-            raise HTTPException(status_code=400, detail="Request body is empty.")
-
-        # Will need to put this video id into nosql data collection 
-        video_id = str(uuid.uuid4())
-        try: 
-            metadata_dict = json.loads(metadata)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail="metadata must be valid JSON")
-        if not isinstance(metadata_dict, dict):
-            raise HTTPException(status_code=400, detail="metadata must be JSON object")
-        session_id = metadata_dict.get("session_id")
-        if not session_id or not isinstance(session_id, str):
-            raise HTTPException(status_code=400, detail="session_id is required.")
-        extension = self.__extension_from_content_type(content_type)
-        if extension == "bin":
-            raise HTTPException(
-                status_code=415,
-                detail="Unsupported media type. Could not determine a valid video format.",
-            )
-        s3_key = f"videos/{video_id}.{extension}"
-
-        session_doc = await self.__user_session_metadata.find_one(
-         {"user_id": session_payload.get("sub"), "session_id": session_id}
-         )
-        if not session_doc:
-            raise HTTPException(status_code=404, detail="Session not found.")
-        
-        try:
-            self.__s3_client.put_object(
-                Bucket=self.__bucket_name,
-                Key=s3_key,
-                Body=video_bytes,
-                ContentType=content_type,
-                Metadata={
-                    "video_id": video_id,
-                    "session_id" : session_id
-                          },
-            )
-        except (BotoCoreError, ClientError) as exc:
-            raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
-        
+               
         session_payload = {
-            "video_id": video_id,
+            "video_id": request_payload.get("video_id"),
             "bucket": self.__bucket_name,
-            "s3_key": s3_key,
+            "s3_key": request_payload.get("s3_key"),
         }
 
         try:
@@ -179,11 +130,9 @@ class TranscribeRouter:
                 transcript = response.json()
                 await self.__user_session_metadata.update_one(
                     {"user_id" : payload["sub"],
-                     "session_id" : session_id
+                     "session_id" : request_payload.get("session_id")
                      },
                     {"$set": {
-                        "video_id": video_id,
-                        "s3_key": s3_key,
                         "transcript": transcript}}
                 )
             return transcript
@@ -197,14 +146,6 @@ class TranscribeRouter:
                 status_code=502,
                 detail=f"Failed to parse transcribe endpoint response: {exc}",
             ) from exc
-
-    @staticmethod
-    def __extension_from_content_type(content_type: str) -> str:
-        subtype = content_type.split("/", 1)[1]
-        clean_subtype = subtype.split(";", 1)[0].strip().lower()
-        if clean_subtype in {"quicktime"}:
-            return "mov"
-        return clean_subtype or "bin"
 
     @property
     def router(self) -> APIRouter:

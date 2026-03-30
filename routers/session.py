@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from auth import AuthUtility
 from db.db import Database
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -86,6 +86,70 @@ class SessionRouter:
             },
             {"_id": 0},
         )
+
+    async def upload_video(self, request: Request, video: UploadFile = File(...)):
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=1,
+            window_seconds=30,
+            route_name="/load-session-video",
+        )
+        session_payload = self.__auth_utility.require_session(request)
+        session_id = request.query_params.get("session_id")
+        content_type = video.headers.get("content-type", "")
+        
+        if not self.__bucket_name:
+            raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
+              
+        if not content_type.startswith("video/"):
+            raise HTTPException(
+                status_code=415,
+                detail="Unsupported media type. Expected video/* content type.",
+            )
+        video_bytes = await video.read()
+        if not video_bytes:
+            raise HTTPException(status_code=400, detail="Request body is empty.")
+        video_id = str(uuid.uuid4())
+        extension = self.__extension_from_content_type(content_type)
+        s3_key = f"videos/{video_id}.{extension}"
+        session_doc = await self.__user_session_metadata.find_one(
+         {"user_id": session_payload.get("sub"), "session_id": session_id}
+         )
+        if not session_doc:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        
+        try:
+            self.__s3_client.put_object(
+                Bucket=self.__bucket_name,
+                Key=s3_key,
+                Body=video_bytes,
+                ContentType=content_type,
+                Metadata={
+                    "video_id": video_id,
+                    "session_id" : session_id
+                          },
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
+        await self.__user_session_metadata.update_one(
+            {"user_id" : session_payload["sub"],
+             "session_id" : session_id
+             },
+            {"$set": {
+                "video_id": video_id,
+                "s3_key": s3_key}}
+            )
+        
+        return await self.__user_session_metadata.find_one(
+            {
+                "user_id": session_payload.get("sub"),
+                "session_id": session_id
+            },
+            {"_id": 0},
+        )
+        
+
+
     async def load_session_video(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
             request=request,
@@ -185,6 +249,14 @@ class SessionRouter:
     def __iter_video(streaming_body, chunk_size: int = 1024 * 1024):
         while chunk := streaming_body.read(chunk_size):
             yield chunk
+
+    @staticmethod
+    def __extension_from_content_type(content_type: str) -> str:
+        subtype = content_type.split("/", 1)[1]
+        clean_subtype = subtype.split(";", 1)[0].strip().lower()
+        if clean_subtype in {"quicktime"}:
+            return "mov"
+        return clean_subtype or "bin"
 
     @property
     def router(self) -> APIRouter:
