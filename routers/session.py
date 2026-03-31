@@ -129,6 +129,7 @@ class SessionRouter:
                     "session_id" : session_id
                           },
             )
+
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
         await self.__user_session_metadata.update_one(
@@ -164,6 +165,8 @@ class SessionRouter:
                 Bucket=self.__bucket_name,
                 Key=s3_key,
             )
+        except self.__s3_client.exceptions.NoSuchKey as exc:
+            raise HTTPException(status_code=404, detail="Video not found")
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 download failed: {exc}") from exc
         filename = quote(os.path.basename(s3_key))
