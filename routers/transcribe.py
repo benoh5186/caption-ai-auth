@@ -33,17 +33,17 @@ class TranscribeRouter:
 
     def __register_routes(self) -> None:
         self.__router.add_api_route(
-            "/transcribe",
+            "/transcribe/{session_id}",
             self.transcribe,
             methods=["POST"],
         )
         self.__router.add_api_route(
-            "/download/{video_id}",
+            "/download/{session_id}",
             self.download,
             methods=["GET"],
         )
 
-    async def download(self, request: Request):
+    async def download(self, request: Request, session_id):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=1,
@@ -51,11 +51,12 @@ class TranscribeRouter:
             route_name="/download",
         )
         session_payload = self.__auth_utility.require_session(request)
+        request_body = await request.json()
 
         session_mongodb = await self.__user_session_metadata.find_one(
             {
                 "user_id": session_payload.get("sub"),
-                "video_id": session_payload.get("session_id"),
+                "video_id": session_id,
             }
         )
         if not session_mongodb:
@@ -69,8 +70,8 @@ class TranscribeRouter:
             "video_id": session_mongodb.get("video_id"),
             "s3_key": s3_key,
             "s3_burned_video_bucket": self.__burned_video,
-            "video_metadata": session_payload.get("session_metadata"),
-            "transcript" : session_payload.get("transcript")
+            "video_metadata": request_body.get("session_metadata"),
+            "transcript" : request_body.get("transcript")
         }
         try: 
             async with httpx.AsyncClient() as client:
@@ -104,7 +105,7 @@ class TranscribeRouter:
         )
 
 
-    async def transcribe(self, request: Request):
+    async def transcribe(self, request: Request, session_id):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=2,
@@ -112,14 +113,20 @@ class TranscribeRouter:
             route_name="/transcribe",
         )
         payload = self.__auth_utility.require_session(request)
-        request_payload = await request.json()
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
+        
+        session_mongodb = await self.__user_session_metadata.find_one(
+            {
+                "user_id": payload.get("sub"),
+                "video_id": session_id,
+            }
+        )
                
         session_payload = {
-            "video_id": request_payload.get("video_id"),
+            "video_id": session_mongodb.get("video_id"),
             "bucket": self.__bucket_name,
-            "s3_key": request_payload.get("s3_key"),
+            "s3_key": session_mongodb.get("s3_key"),
         }
 
         try:
@@ -129,7 +136,7 @@ class TranscribeRouter:
                 transcript = response.json()
                 await self.__user_session_metadata.update_one(
                     {"user_id" : payload["sub"],
-                     "session_id" : request_payload.get("session_id")
+                     "session_id" : session_id
                      },
                     {"$set": {
                         "transcript": transcript}}
