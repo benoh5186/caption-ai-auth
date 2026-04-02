@@ -43,7 +43,7 @@ class TranscribeRouter:
             methods=["GET"],
         )
 
-    async def download(self, video_id: str, request: Request):
+    async def download(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=1,
@@ -55,23 +55,22 @@ class TranscribeRouter:
         session_mongodb = await self.__user_session_metadata.find_one(
             {
                 "user_id": session_payload.get("sub"),
-                "video_id": video_id,
+                "video_id": session_payload.get("session_id"),
             }
         )
         if not session_mongodb:
             raise HTTPException(status_code=404, detail="Video metadata not found.")
 
-        session_metadata = session_mongodb.get("session_info", {})
         s3_key = session_mongodb.get("s3_key")
         if not s3_key:
             raise HTTPException(status_code=404, detail="Video storage key not found.")
 
         payload = {
             "video_id": session_mongodb.get("video_id"),
-            "s3_key": session_mongodb.get("s3_key"),
+            "s3_key": s3_key,
             "s3_burned_video_bucket": self.__burned_video,
-            "video_metadata": session_metadata,
-            "transcript" : session_mongodb.get("transcript")
+            "video_metadata": session_payload.get("session_metadata"),
+            "transcript" : session_payload.get("transcript")
         }
         try: 
             async with httpx.AsyncClient() as client:

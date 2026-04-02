@@ -141,13 +141,7 @@ class SessionRouter:
                 "s3_key": s3_key}}
             )
         
-        return await self.__user_session_metadata.find_one(
-            {
-                "user_id": session_payload.get("sub"),
-                "session_id": session_id
-            },
-            {"_id": 0},
-        )
+        return {"s3_key" : s3_key}
         
 
 
