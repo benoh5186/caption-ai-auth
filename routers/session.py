@@ -71,7 +71,7 @@ class SessionRouter:
         return sessions 
 
 
-    async def load_session(self, request: Request):
+    async def load_session(self, request: Request, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=10,
@@ -82,7 +82,7 @@ class SessionRouter:
         return await self.__user_session_metadata.find_one(
             {
                 "user_id": session_payload.get("sub"),
-                "session_id": request.query_params.get("session_id")
+                "session_id": session_id
             },
             {"_id": 0},
         )
@@ -145,15 +145,21 @@ class SessionRouter:
         
 
 
-    async def load_session_video(self, request: Request):
+    async def load_session_video(self, request: Request, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=1,
             window_seconds=30,
             route_name="/load-session-video",
         )
-        self.__auth_utility.require_session(request)
-        s3_key = request.query_params.get("s3_key")
+        payload = self.__auth_utility.require_session(request)
+        session_doc = await self.__user_session_metadata.find_one(
+            {"user_id" : payload.get("sub"), "session_id" : session_id},
+            {"_id" : 0, "s3_key" : 1}
+        )
+        if not session_doc:
+            return HTTPException(status_code=404, detail="video key not found")
+        s3_key = session_doc["s3_key"]
         try:
             s3_object = self.__s3_client.get_object(
                 Bucket=self.__bucket_name,
@@ -195,7 +201,7 @@ class SessionRouter:
             raise HTTPException(status_code=403, detail="can't create anymore sessions")
 
     
-    async def delete_session(self, request: Request):
+    async def delete_session(self, request: Request, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=1,
@@ -203,7 +209,6 @@ class SessionRouter:
             route_name="/delete-session",
         )
         session_payload = self.__auth_utility.require_session(request)
-        session_id = request.query_params.get("session_id")
         await self.__user_session_metadata.delete_one({
             "user_id" : session_payload.get("sub"),
             "session_id" : session_id
