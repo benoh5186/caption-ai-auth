@@ -163,21 +163,6 @@ class AuthRouter:
         self.__auth_utility.set_session_cookie(response, token)
         return response
 
-    async def authenticate(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=60,
-            window_seconds=60,
-            route_name="/dashboard",
-        )
-        session_payload = self.__auth_utility.require_session(request)
-        return {
-            "message": "Authenticated.",
-            "user": {
-                "user_id": session_payload.get("sub"),
-                "email": session_payload.get("email"),
-            },
-        }
 
     @staticmethod
     def __hash_password(password: str) -> str:
