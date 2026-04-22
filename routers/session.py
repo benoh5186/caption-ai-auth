@@ -30,12 +30,12 @@ class SessionRouter:
             methods=["GET"]
         )
         self.__router.add_api_route(
-            "/load-session",
+            "/load-session/{session_id}",
             self.load_session,
             methods=["GET"]
         )
         self.__router.add_api_route(
-            "load-session-video",
+            "load-session-video/{session_id}",
             self.load_session_video,
             methods=["POST"]
         )
@@ -63,10 +63,10 @@ class SessionRouter:
             route_name="/load-sessions",
         )
         session_payload = self.__auth_utility.require_session(request)
-        cursor = self.__user_session_metadata.find({
+        cursor = self.__user_session_metadata.find(
             {"user_id" : session_payload.get("sub")},
-            {"_id": 0},
-            })
+            {"_id": 0, "session_id": 1},
+            )
         sessions = await cursor.to_list(length=100)
         return sessions 
 
