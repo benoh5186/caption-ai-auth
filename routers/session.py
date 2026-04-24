@@ -84,7 +84,7 @@ class SessionRouter:
                 "user_id": session_payload.get("sub"),
                 "session_id": session_id
             },
-            {"_id": 0},
+            {"_id": 0, "transcript" : 1, "session_info" : 1},
         )
 
     async def upload_video(self, request: Request, video: UploadFile = File(...)):
@@ -141,7 +141,7 @@ class SessionRouter:
                 "s3_key": s3_key}}
             )
         
-        return {"s3_key" : s3_key}
+        return 
         
 
 
