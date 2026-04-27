@@ -212,7 +212,7 @@ class SessionRouter:
             self.__user_session_metadata.insert_one({
                 "user_id" : session_payload.get("sub"),
                 "session_id" : session_id,
-                "title" : "Untitled Session"
+                "title" : "Untitled Session",
                 "transcript" : None,
                 "session_info" : None
             })
