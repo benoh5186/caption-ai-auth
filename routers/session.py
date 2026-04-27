@@ -8,6 +8,8 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi.responses import StreamingResponse, JSONResponse
 from urllib.parse import quote
 import uuid
+import subprocess
+import tempfile
 
 class SessionRouter:
     def __init__(self, user_sessions: Database, mongo_db: AsyncIOMotorClient,auth_utility: AuthUtility):
@@ -22,6 +24,7 @@ class SessionRouter:
             aws_secret_access_key=os.getenv("AWS_S3_SECRET_KEY"),
             region_name=os.getenv("AWS_REGION"),
         )
+        self.__register_routes()
 
     def __register_routes(self):
         self.__router.add_api_route(
@@ -65,9 +68,16 @@ class SessionRouter:
         session_payload = self.__auth_utility.require_session(request)
         cursor = self.__user_session_metadata.find(
             {"user_id" : session_payload.get("sub")},
-            {"_id": 0, "session_id": 1},
+            {"_id": 0, "session_id": 1, "title" : 1, "thumbnail_s3_key" : 1},
             )
         sessions = await cursor.to_list(length=100)
+        for session in sessions:
+            thumbnail_key = session.get("thumbnail_s3_key")
+            session["thumbnail_url"] = (
+                f"https://{self.__bucket_name}.s3.amazonaws.com/{thumbnail_key}"
+                if thumbnail_key
+                else None
+            )
         return sessions 
 
 
@@ -84,7 +94,7 @@ class SessionRouter:
                 "user_id": session_payload.get("sub"),
                 "session_id": session_id
             },
-            {"_id": 0, "transcript" : 1, "session_info" : 1},
+            {"_id": 0, "transcript" : 1, "session_info" : 1, "title" : 1},
         )
 
     async def upload_video(self, request: Request, video: UploadFile = File(...)):
@@ -109,7 +119,10 @@ class SessionRouter:
         video_bytes = await video.read()
         if not video_bytes:
             raise HTTPException(status_code=400, detail="Request body is empty.")
+        thumbnail_bytes = self.create_thumbnail(video_bytes)
+        thumbnail_s3_key = f"thumbnails/{session_id}.jpg"
         video_id = str(uuid.uuid4())
+
         extension = self.__extension_from_content_type(content_type)
         s3_key = f"videos/{video_id}.{extension}"
         session_doc = await self.__user_session_metadata.find_one(
@@ -130,6 +143,13 @@ class SessionRouter:
                           },
             )
 
+            self.__s3_client.put_object(
+                Bucket=self.__bucket_name,
+                Key=thumbnail_s3_key,
+                Body=thumbnail_bytes,
+                ContentType="image/jpeg",
+            )
+
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
         await self.__user_session_metadata.update_one(
@@ -138,7 +158,9 @@ class SessionRouter:
              },
             {"$set": {
                 "video_id": video_id,
-                "s3_key": s3_key}}
+                "s3_key": s3_key,
+                "thumbnail_s3_key": thumbnail_s3_key
+                }}
             )
         
         return 
@@ -158,7 +180,7 @@ class SessionRouter:
             {"_id" : 0, "s3_key" : 1}
         )
         if not session_doc:
-            return HTTPException(status_code=404, detail="video key not found")
+            raise HTTPException(status_code=404, detail="video key not found")
         s3_key = session_doc["s3_key"]
         try:
             s3_object = self.__s3_client.get_object(
@@ -190,6 +212,7 @@ class SessionRouter:
             self.__user_session_metadata.insert_one({
                 "user_id" : session_payload.get("sub"),
                 "session_id" : session_id,
+                "title" : "Untitled Session"
                 "transcript" : None,
                 "session_info" : None
             })
@@ -238,6 +261,7 @@ class SessionRouter:
 
         insert_payload = {
             "session_info": session_info["video_metadata"],
+            "title" : session_info["title"]
         }
         await self.__user_session_metadata.update_one(
             {"user_id": session_payload.get("sub"),
@@ -259,6 +283,57 @@ class SessionRouter:
         if clean_subtype in {"quicktime"}:
             return "mov"
         return clean_subtype or "bin"
+    
+    @staticmethod
+    def create_thumbnail(video_bytes: bytes, timestamp: str = "00:00:01") -> bytes:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as video_file:
+            video_file.write(video_bytes)
+            video_path = video_file.name
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as thumb_file:
+            thumbnail_path = thumb_file.name
+
+        try:
+            try:
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-ss",
+                        timestamp,
+                        "-i",
+                        video_path,
+                        "-frames:v",
+                        "1",
+                        "-vf",
+                        "scale=320:-1",
+                        thumbnail_path,
+                        "-y",
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+            except FileNotFoundError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="ffmpeg is not installed on the server.",
+                ) from exc
+            except subprocess.CalledProcessError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Thumbnail generation failed.",
+                ) from exc
+
+            with open(thumbnail_path, "rb") as file:
+                return file.read()
+
+        finally:
+            if os.path.exists(video_path):
+                os.remove(video_path)
+            if os.path.exists(thumbnail_path):
+                os.remove(thumbnail_path)
+
 
     @property
     def router(self) -> APIRouter:
