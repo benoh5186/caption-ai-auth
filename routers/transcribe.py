@@ -18,7 +18,6 @@ class TranscribeRouter:
     def __init__(self, mongo_db: AsyncIOMotorClient, auth_utility: AuthUtility) -> None:
         self.__router = APIRouter(prefix="/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
-        self.__burned_video = os.getenv("S3_BURNED_VIDEO")
         self.__transcribe_endpoint = "https://dummy.api/transcribe"  # Dummy endpoint for now.
         self.__download_endpoint = "https://dummy.api/download"
         self.__s3_client = boto3.client(
@@ -69,7 +68,7 @@ class TranscribeRouter:
         payload = {
             "video_id": session_mongodb.get("video_id"),
             "s3_key": s3_key,
-            "s3_burned_video_bucket": self.__burned_video,
+            "s3_burned_video_bucket": self.__bucket_name,
             "video_metadata": request_body.get("session_metadata"),
             "transcript" : request_body.get("transcript")
         }
@@ -90,7 +89,7 @@ class TranscribeRouter:
         
         try:
             s3_object = self.__s3_client.get_object(
-                Bucket=self.__burned_video,
+                Bucket=self.__bucket_name,
                 Key=s3_key,
             )
         except (BotoCoreError, ClientError) as exc:
