@@ -142,6 +142,11 @@ class AuthRouter:
         )
         self.__auth_utility.set_session_cookie(response, token)
         return response
+    
+    async def authenticate(self, request: Request):
+        self.__auth_utility.require_session(request)
+        return 
+
 
     async def login(self, request: Request):
         self.__auth_utility.enforce_rate_limit(
