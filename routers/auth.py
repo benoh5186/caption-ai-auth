@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from db.db import Database
-from schemas.user import UserAlreadyExistsError, UserCreate, UserLogin
+from schemas.user import UserAlreadyExistsError, UserCreate, UserLogin, UserSignup
 
 
 class AuthUtility:
@@ -113,18 +113,16 @@ class AuthRouter:
         self.__router.add_api_route("/login", self.login, methods=["POST"])
         self.__router.add_api_route("/dashboard", self.dashboard, methods=["GET"])
 
-    async def signup(self, request: Request):
+    async def signup(self, signup: UserLogin, request: Request):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=2,
             window_seconds=60,
             route_name="/signup",
         )
-        payload = await request.json()
-        login = UserLogin.model_validate(payload)
         user_create = UserCreate(
-            email=login.email,
-            password_hash=self.__hash_password(login.password),
+            email=signup.email,
+            password_hash=self.__hash_password(signup.password),
         )
 
         try:
@@ -148,15 +146,13 @@ class AuthRouter:
         return 
 
 
-    async def login(self, request: Request):
+    async def login(self, login: UserLogin, request: Request):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=6,
             window_seconds=60,
             route_name="/login",
         )
-        payload = await request.json()
-        login = UserLogin.model_validate(payload)
         password_hash = self.__hash_password(login.password)
         user = self.__user.authenticate_user(login, password_hash)
         if not user:

@@ -56,6 +56,11 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str = Field(min_length=3)
 
+class UserSignup(BaseModel):
+    email: EmailStr
+    full_name: Optional[str] = None
+    password: str = Field(min_length=3)
+
 
 class UserAlreadyExistsError(Exception):
     def __init__(self, email: str) -> None:
