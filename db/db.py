@@ -335,6 +335,7 @@ class Database:
         if row is None:
             return None
 
+        row["id"] = str(row["id"])
         row["status"] = row.get("status") or UserStatus.INVITED.value
         row["metadata"] = self.__to_dict(row.get("metadata"))
         return UserSchema.model_validate(row)

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
-from auth import AuthUtility
+from routers.auth import AuthUtility
 from db.db import Database
 from motor.motor_asyncio import AsyncIOMotorClient
 import os 
@@ -13,7 +13,7 @@ import tempfile
 
 class SessionRouter:
     def __init__(self, user_sessions: Database, mongo_db: AsyncIOMotorClient,auth_utility: AuthUtility):
-        self.__router = APIRouter(prefix="/session", tags=["session"])
+        self.__router = APIRouter(prefix="/api/v1/session", tags=["session"])
         self.__user = user_sessions
         self.__auth_utility = auth_utility
         self.__user_session_metadata = mongo_db["user_session_metadata"]
@@ -38,22 +38,22 @@ class SessionRouter:
             methods=["GET"]
         )
         self.__router.add_api_route(
-            "load-session-video/{session_id}",
+            "/load-session-video/{session_id}",
             self.load_session_video,
             methods=["POST"]
         )
         self.__router.add_api_route(
-            "create-session",
+            "/create-session",
             self.create_session,
             methods=["GET"]
         )
         self.__router.add_api_route(
-            "delete-session/{session_id}",
+            "/delete-session/{session_id}",
             self.delete_session,
             methods=["DELETE"]
         )
         self.__router.add_api_route(
-            "save-session",
+            "/save-session",
             self.save_session,
             methods=["POST"]
         )
@@ -89,13 +89,16 @@ class SessionRouter:
             route_name="/load-session",
         )
         session_payload = self.__auth_utility.require_session(request)
-        return await self.__user_session_metadata.find_one(
+        session =  await self.__user_session_metadata.find_one(
             {
                 "user_id": session_payload.get("sub"),
                 "session_id": session_id
             },
             {"_id": 0, "transcript" : 1, "session_info" : 1, "title" : 1},
         )
+        if session is None:
+            return HTTPException(status_code=404, detail="no such session")
+        return session
 
     async def upload_video(self, request: Request, video: UploadFile = File(...)):
         self.__auth_utility.enforce_rate_limit(

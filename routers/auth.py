@@ -1,4 +1,5 @@
 import hashlib
+import bcrypt 
 import os
 import time
 from collections import defaultdict, deque
@@ -103,7 +104,7 @@ class AuthUtility:
 
 class AuthRouter:
     def __init__(self, user: Database, auth_utility: AuthUtility) -> None:
-        self.__router = APIRouter(prefix="/auth", tags=["auth"])
+        self.__router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
         self.__user = user
         self.__auth_utility = auth_utility
         self.__register_routes()
@@ -111,7 +112,7 @@ class AuthRouter:
     def __register_routes(self) -> None:
         self.__router.add_api_route("/signup", self.signup, methods=["POST"])
         self.__router.add_api_route("/login", self.login, methods=["POST"])
-        self.__router.add_api_route("/dashboard", self.dashboard, methods=["GET"])
+        self.__router.add_api_route("/authenticate", self.authenticate, methods=["GET"])
 
     async def signup(self, signup: UserLogin, request: Request):
         self.__auth_utility.enforce_rate_limit(
@@ -153,10 +154,12 @@ class AuthRouter:
             window_seconds=60,
             route_name="/login",
         )
-        password_hash = self.__hash_password(login.password)
-        user = self.__user.authenticate_user(login, password_hash)
-        if not user:
+        user = self.__user.get_user_by_email(login.email)
+        if not user or not user.password_hash:
             raise HTTPException(status_code=401, detail="Invalid email or password.")
+        
+        if not self.__verify_password(login.password, user.password_hash):
+            raise HTTPException(status_code=401, detail='Invalid email or password')
 
         self.__user.update_last_login(user.id)
         token = self.__auth_utility.create_token(user_id=user.id, email=str(user.email))
@@ -167,8 +170,13 @@ class AuthRouter:
 
     @staticmethod
     def __hash_password(password: str) -> str:
-        return hashlib.sha256(password.encode("utf-8")).hexdigest()
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode('utf-8')
 
+    @staticmethod
+    def __verify_password(login_password: str, db_password: str) -> bool:
+        login_password_encoded = login_password.encode("utf-8")
+        db_password_encoded = db_password.encode("utf-8")
+        return bcrypt.checkpw(login_password_encoded, db_password_encoded)
 
     @property
     def router(self) -> APIRouter:

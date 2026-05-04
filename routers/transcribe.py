@@ -16,10 +16,10 @@ import json
 
 class TranscribeRouter:
     def __init__(self, mongo_db: AsyncIOMotorClient, auth_utility: AuthUtility) -> None:
-        self.__router = APIRouter(prefix="/transcribe", tags=["transcribe"])
+        self.__router = APIRouter(prefix="/api/v1/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
-        self.__transcribe_endpoint = "https://dummy.api/transcribe"  # Dummy endpoint for now.
-        self.__download_endpoint = "https://dummy.api/download"
+        self.__transcribe_endpoint = "localhost:9000/api/v1/transcribe"  
+        self.__download_endpoint = "localhost:9000/api/v1/download"
         self.__s3_client = boto3.client(
             "s3",
             aws_access_key_id=os.getenv("AWS_S3_ACCESS_KEY"),
