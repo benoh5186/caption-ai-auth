@@ -53,8 +53,13 @@ class SessionRouter:
             methods=["DELETE"]
         )
         self.__router.add_api_route(
-            "/save-session",
+            "/save-session/{session_id}",
             self.save_session,
+            methods=["POST"]
+        )
+        self.__router.add_api_route(
+            "/upload-video/{session_id}",
+            self.upload_video,
             methods=["POST"]
         )
 
@@ -100,7 +105,7 @@ class SessionRouter:
             return HTTPException(status_code=404, detail="no such session")
         return session
 
-    async def upload_video(self, request: Request, video: UploadFile = File(...)):
+    async def upload_video(self, request: Request, session_id: str, video: UploadFile = File(...)):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=1,
@@ -108,7 +113,6 @@ class SessionRouter:
             route_name="/load-session-video",
         )
         session_payload = self.__auth_utility.require_session(request)
-        session_id = request.query_params.get("session_id")
         content_type = video.headers.get("content-type", "")
         
         if not self.__bucket_name:
@@ -246,7 +250,7 @@ class SessionRouter:
         )
 
 
-    async def save_session(self, request: Request):
+    async def save_session(self, request: Request, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=1,
@@ -268,7 +272,7 @@ class SessionRouter:
         }
         await self.__user_session_metadata.update_one(
             {"user_id": session_payload.get("sub"),
-             "session_id": session_info["session_id"]},
+             "session_id": session_id},
             {"$set": insert_payload})
         return {
             "message": "Session saved successfully."
