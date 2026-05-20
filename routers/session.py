@@ -177,8 +177,8 @@ class SessionRouter:
     async def load_session_video(self, request: Request, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
-            max_requests=1,
-            window_seconds=30,
+            max_requests=20,
+            window_seconds=60,
             route_name="/load-session-video",
         )
         payload = self.__auth_utility.require_session(request)
@@ -186,15 +186,19 @@ class SessionRouter:
             {"user_id" : payload.get("sub"), "session_id" : session_id},
             {"_id" : 0, "s3_key" : 1}
         )
+        print(session_doc)
         if not session_doc:
+            print("yeet")
             raise HTTPException(status_code=404, detail="video key not found")
         s3_key = session_doc["s3_key"]
+        print(s3_key)
         try:
             s3_object = self.__s3_client.get_object(
                 Bucket=self.__bucket_name,
                 Key=s3_key,
             )
         except self.__s3_client.exceptions.NoSuchKey as exc:
+            print("yeet")
             raise HTTPException(status_code=404, detail="Video not found")
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 download failed: {exc}") from exc
@@ -253,8 +257,8 @@ class SessionRouter:
     async def save_session(self, request: Request, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
-            max_requests=1,
-            window_seconds=30,
+            max_requests=10,
+            window_seconds=60,
             route_name="/save-session",
         )
         session_payload = self.__auth_utility.require_session(request)
@@ -267,7 +271,8 @@ class SessionRouter:
             raise HTTPException(status_code=400, detail="session_info must be a JSON object.")
 
         insert_payload = {
-            "session_info": session_info["video_metadata"],
+            "transcript" : session_info["transcript"],
+            "session_info": session_info["styleData"],
             "title" : session_info["title"]
         }
         await self.__user_session_metadata.update_one(

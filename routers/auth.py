@@ -18,7 +18,7 @@ class AuthUtility:
         self._secret = os.getenv("JWT_SECRET_KEY")
         self._algorithm = os.getenv("JWT_ALGORITHM")
         self._cookie_name = "session_token"
-        self._session_minutes = 5
+        self._session_minutes = 60
         self._requests = defaultdict(deque)
 
     def create_token(self, user_id: str, email: str) -> str:

@@ -18,8 +18,8 @@ class TranscribeRouter:
     def __init__(self, mongo_db: AsyncIOMotorClient, auth_utility: AuthUtility) -> None:
         self.__router = APIRouter(prefix="/api/v1/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
-        self.__transcribe_endpoint = "localhost:9000/api/v1/transcribe"  
-        self.__download_endpoint = "localhost:9000/api/v1/download"
+        self.__transcribe_endpoint = "http://localhost:9000/api/v1/transcribe-video"  
+        self.__download_endpoint = "http://localhost:9000/api/v1/download-video"
         self.__s3_client = boto3.client(
             "s3",
             aws_access_key_id=os.getenv("AWS_S3_ACCESS_KEY"),
@@ -39,7 +39,7 @@ class TranscribeRouter:
         self.__router.add_api_route(
             "/download/{session_id}",
             self.download,
-            methods=["GET"],
+            methods=["POST"],
         )
 
     async def download(self, request: Request, session_id):
@@ -118,9 +118,13 @@ class TranscribeRouter:
         session_mongodb = await self.__user_session_metadata.find_one(
             {
                 "user_id": payload.get("sub"),
-                "video_id": session_id,
+                "session_id": session_id,
             }
         )
+        if not session_mongodb:
+            raise HTTPException(status_code=404, detail="Session metadata not found.")
+        if not session_mongodb.get("video_id") or not session_mongodb.get("s3_key"):
+            raise HTTPException(status_code=404, detail="Video metadata not found.")
                
         session_payload = {
             "video_id": session_mongodb.get("video_id"),
@@ -129,8 +133,11 @@ class TranscribeRouter:
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            timeout = httpx.Timeout(300.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(self.__transcribe_endpoint, json=session_payload)
+                print("transcribe status:", response.status_code)
+                print("transcribe body:", response.text[:1000])
                 response.raise_for_status()
                 transcript = response.json()
                 await self.__user_session_metadata.update_one(

@@ -17,19 +17,30 @@ class Database:
         self.__user = os.getenv("MYSQLDB_USER")
         self.__password = os.getenv("MYSQLDB_PASSWORD")
         self.__database = os.getenv("MYSQLDB_DB")
+        self.__ssl_enabled = os.getenv("MYSQLDB_SSL", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
         self.__connection = None
 
     def start_database(self) -> None:
-        self.__connection = pymysql.connect(
-            host=self.__host,
-            port=self.__port,
-            user=self.__user,
-            password=self.__password,
-            database=self.__database,
-            cursorclass=DictCursor,
-            ssl={'ssl': True},
-            autocommit=False,
-        )
+        connection_args = {
+            "host": self.__host,
+            "port": self.__port,
+            "user": self.__user,
+            "password": self.__password,
+            "database": self.__database,
+            "cursorclass": DictCursor,
+            "connect_timeout": 10,
+            "read_timeout": 30,
+            "write_timeout": 30,
+            "autocommit": False,
+        }
+        if self.__ssl_enabled:
+            connection_args["ssl"] = {"ssl": True}
+
+        self.__connection = pymysql.connect(**connection_args)
 
     def ensure_connection(self) -> None:
         if self.__connection is None:
@@ -39,6 +50,11 @@ class Database:
         try:
             self.__connection.ping(reconnect=True)
         except pymysql.MySQLError:
+            try:
+                self.__connection.close()
+            except pymysql.MySQLError:
+                pass
+            self.__connection = None
             self.start_database()
 
     def __fetch_one(self, query: str, params: tuple[Any, ...] | None = None) -> dict[str, Any] | None:
