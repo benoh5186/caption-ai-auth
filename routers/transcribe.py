@@ -50,8 +50,6 @@ class TranscribeRouter:
             route_name="/download",
         )
         session_payload = self.__auth_utility.require_session(request)
-        request_body = await request.json()
-
         session_mongodb = await self.__user_session_metadata.find_one(
             {
                 "user_id": session_payload.get("sub"),
@@ -69,8 +67,8 @@ class TranscribeRouter:
             "video_id": session_mongodb.get("video_id"),
             "s3_key": s3_key,
             "s3_burned_video_bucket": self.__bucket_name,
-            "video_metadata": request_body.get("session_metadata"),
-            "transcript" : request_body.get("transcript")
+            "video_metadata": session_mongodb.get("session_info"),
+            "transcript" : session_mongodb.get("transcript")
         }
         try: 
             async with httpx.AsyncClient() as client:
