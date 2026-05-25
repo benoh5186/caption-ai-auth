@@ -1,3 +1,5 @@
+import pysubs2
+
 class SubtitleStyler:
     def __init__(self, subtitle_source, word_by_word=False):
         """
