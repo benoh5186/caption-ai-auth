@@ -66,12 +66,13 @@ class TranscribeRouter:
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as video_file:
                 temp_video_path = video_file.name 
-                s3_client.download_file_obj(self.__bucket_name, s3_key, video_file)
+                s3_client.download_fileobj(self.__bucket_name, s3_key, video_file)
             with tempfile.NamedTemporaryFile(delete=False) as subtitle_file:
                 temp_subtitle_path = subtitle_file.name 
                 subtitle_styler = SubtitleStyler(session_mongodb.get("transcript"))
                 subtitle_styler.implement_styling(session_mongodb.get("session_info"), temp_subtitle_path)
         except Exception as exc:
+            print(exc)
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         try:
             s3_object = self.__s3_client.get_object(

@@ -14,12 +14,12 @@ class SubtitleEmbedder:
         error = None 
         
         process = subprocess.Popen(
-            "ffmpeg",
+            ["ffmpeg",
             "-i", self.__video_path,
             "-vf", f"subtitles={self.__subtitle_path}",
             "-f", "mp4",
             "-movflags", "frag_keyframe+empty_moov",
-            "-",
+            "-",],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         try:
