@@ -10,7 +10,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from routers.auth import AuthUtility
 from fastapi.responses import StreamingResponse
 import json
-
+from services.subtitle_styler import SubtitleStyler
+from services.subtitle_embedder import SubtitleEmbedder
+import tempfile 
 
 
 
@@ -53,52 +55,24 @@ class TranscribeRouter:
         session_mongodb = await self.__user_session_metadata.find_one(
             {
                 "user_id": session_payload.get("sub"),
-                "session_id": session_id,
+                "session_id": session_id 
             }
         )
-        if not session_mongodb:
-            raise HTTPException(status_code=404, detail="Video metadata not found.")
-
         s3_key = session_mongodb.get("s3_key")
-        if not s3_key:
-            raise HTTPException(status_code=404, detail="Video storage key not found.")
-
-        payload = {
-            "video_id": session_mongodb.get("video_id"),
-            "s3_key": s3_key,
-            "s3_burned_video_bucket": self.__bucket_name,
-            "video_metadata": session_mongodb.get("session_info"),
-            "transcript" : session_mongodb.get("transcript")
-        }
-        try: 
-            async with httpx.AsyncClient() as client:
-                response = await client.post(self.__download_endpoint, json=payload)
-                response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            try:
-                error_body = exc.response.json()
-                error_detail = error_body.get("detail", error_body)
-            except ValueError:
-                error_detail = exc.response.text
-
-            print("Download endpoint error:", error_detail)
-            raise HTTPException(
-                status_code=502,
-                detail=f"Download endpoint returned an error: {exc.response.status_code}",
-            ) from exc
-        except (httpx.RequestError, ValueError) as exc:
-            try:
-                error_body = exc.response.json()
-                error_detail = error_body.get("detail", error_body)
-            except ValueError:
-                error_detail = exc.response.text
-
-            print("Download endpoint error:", error_detail)
-            raise HTTPException(
-                status_code=502,
-                detail=f"Failed to parse download endpoint response: {exc}",
-            ) from exc
-        
+        s3_client = self.__get_s3_client()
+        suffix = os.path.splitext(s3_key)[1] or ".mp4"
+        temp_video_path = None
+        temp_subtitle_path = None 
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as video_file:
+                temp_video_path = video_file.name 
+                s3_client.download_file_obj(self.__bucket_name, s3_key, video_file)
+            with tempfile.NamedTemporaryFile(delete=False) as subtitle_file:
+                temp_subtitle_path = subtitle_file.name 
+                subtitle_styler = SubtitleStyler(session_mongodb.get("transcript"))
+                subtitle_styler.implement_styling(session_mongodb.get("session_info"), temp_subtitle_path)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
         try:
             s3_object = self.__s3_client.get_object(
                 Bucket=self.__bucket_name,
@@ -106,14 +80,20 @@ class TranscribeRouter:
             )
         except (BotoCoreError, ClientError) as exc:
             raise HTTPException(status_code=502, detail=f"S3 download failed: {exc}") from exc
-
+        
+        subtitle_embedder = SubtitleEmbedder(temp_video_path, temp_subtitle_path)
         content_type = s3_object.get("ContentType") or "video/mp4"
         filename = quote(os.path.basename(s3_key))
-        return StreamingResponse(
-            self.__iter_video(s3_object["Body"]),
-            media_type=content_type,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-        )
+        
+        try:
+            return StreamingResponse(
+                content=subtitle_embedder.embed_streaming(),
+                media_type=content_type,
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                )
+        except Exception as exc:
+            raise HTTPException(status_code=501, detail=str(exc)) from exc
+        
 
 
     async def transcribe(self, request: Request, session_id):
@@ -179,3 +159,15 @@ class TranscribeRouter:
     def __iter_video(streaming_body, chunk_size: int = 1024 * 1024):
         while chunk := streaming_body.read(chunk_size):
             yield chunk
+
+    @staticmethod
+    def __get_s3_client():
+        aws_access_key = os.getenv("AWS_S3_ACCESS_KEY")
+        aws_secret_key = os.getenv("AWS_S3_SECRET_KEY")
+        aws_region = os.getenv("AWS_REGION")
+        return boto3.client(
+            "s3",
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key,
+            region_name=aws_region
+        )
