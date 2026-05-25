@@ -45,15 +45,15 @@ class TranscribeRouter:
     async def download(self, request: Request, session_id):
         self.__auth_utility.enforce_rate_limit(
             request=request,
-            max_requests=1,
-            window_seconds=30,
+            max_requests=10,
+            window_seconds=60,
             route_name="/download",
         )
         session_payload = self.__auth_utility.require_session(request)
         session_mongodb = await self.__user_session_metadata.find_one(
             {
                 "user_id": session_payload.get("sub"),
-                "video_id": session_id,
+                "session_id": session_id,
             }
         )
         if not session_mongodb:
@@ -75,11 +75,25 @@ class TranscribeRouter:
                 response = await client.post(self.__download_endpoint, json=payload)
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            try:
+                error_body = exc.response.json()
+                error_detail = error_body.get("detail", error_body)
+            except ValueError:
+                error_detail = exc.response.text
+
+            print("Download endpoint error:", error_detail)
             raise HTTPException(
                 status_code=502,
                 detail=f"Download endpoint returned an error: {exc.response.status_code}",
             ) from exc
         except (httpx.RequestError, ValueError) as exc:
+            try:
+                error_body = exc.response.json()
+                error_detail = error_body.get("detail", error_body)
+            except ValueError:
+                error_detail = exc.response.text
+
+            print("Download endpoint error:", error_detail)
             raise HTTPException(
                 status_code=502,
                 detail=f"Failed to parse download endpoint response: {exc}",
