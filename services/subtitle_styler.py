@@ -96,6 +96,7 @@ class SubtitleStyler:
                 style_name = f"segment_{segment_id}"
                 segment_style = self.__apply_styling(style)
                 self.__source.styles[style_name] = segment_style
+                self.__source.events[int(segment_id)].style = style_name 
         self.__source.styles["Default"] = general_style
         self.__source.save(path, format_="ass")
         
