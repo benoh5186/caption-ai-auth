@@ -63,21 +63,7 @@ class SubtitleStyler:
         keys such as "fontFamily", "fontSize", "textColor", "outlineColor",
         "backgroundColor", "bold", "italic", etc.
         :return: a pysubs2.SSAStyle object configured with the specified styling
-        """
-        kwargs = {"shadow" : 0}
-        for client_key, val in style_data.items():
-            if client_key not in self.__STYLE_FIELD_MAP:
-                continue
-            pyKey, parser = self.__STYLE_FIELD_MAP[client_key]
-            if client_key == "backgroundColor":
-                continue 
-            else: 
-                kwargs[pyKey] = parser(val)
-
-        return pysubs2.SSAStyle(**kwargs)
-    
-    def __apply_background_color(self, style_data):
-        to_ignore = ("outlineColor", "textColor")
+        """ 
         kwargs = {"borderstyle" : 4}
         for client_key, val in style_data.items():
             if client_key not in self.__STYLE_FIELD_MAP:
@@ -85,41 +71,38 @@ class SubtitleStyler:
             pyKey, parser = self.__STYLE_FIELD_MAP[client_key]
             if client_key == "backgroundColor":
                 kwargs[pyKey] = parser(val, "#000000", style_data.get("backgroundOpacity"))
-            elif client_key in to_ignore:
-                continue 
-            else:
+            else: 
                 kwargs[pyKey] = parser(val)
+
         return pysubs2.SSAStyle(**kwargs)
    
 
     def implement_styling(self, style_data, path):
+        """
+        Applies styling configuration to the loaded subtitle data and saves
+        the styled subtitles to the specified path. Supports both individual
+        segment styling and global default styling.
+        :param style_data: a dictionary where keys are segment IDs and values
+        are tuples containing (style_configuration_dict, is_individual_boolean)
+        :param path: a string representing the file path where the styled
+        subtitle file should be saved
+        :precondition style_data: each value must be a tuple with style data
+        at index 0 and a boolean flag at index 1 indicating if styling is
+        individual (True) or global (False)
+        """
         general_style = style_data.get("globalStyle")
-        segment_styles = style_data.get("segmentStyles")
-        new_events = []
-        for id, segment in enumerate(self.__source.events):
-            if str(id) in segment_styles:
-                print("yerrsss")
+        segment_styles = style_data.get("segmentStyles", {})
+        if segment_styles:
+            for segment_id, style in segment_styles.items():
+                style_name = f"segment_{segment_id}"
                 effective_style = {
                     **general_style,
-                    **segment_styles[str(id)]
+                    **style 
                 }
-            else:
-                effective_style = general_style
-            segment_style_event = segment.copy()
-            background_style_event = segment.copy()
-            style_name = f"style_{id}"
-            background_name = f"background_{id}"
-            segment_style = self.__apply_styling(effective_style)
-            background_style = self.__apply_background_color(effective_style)
-            self.__source.styles[style_name] = segment_style
-            self.__source.styles[background_name] = background_style
-            segment_style_event.style = style_name 
-            background_style_event.style = background_name
-            background_style_event.layer = 0
-            segment_style_event.layer = 1
-            new_events.append(background_style_event)
-            new_events.append(segment_style_event)
-        self.__source.events = new_events
+                segment_style = self.__apply_styling(effective_style)
+                self.__source.styles[style_name] = segment_style
+                self.__source.events[int(segment_id)].style = style_name 
+        self.__source.styles["Default"] = self.__apply_styling(general_style)
         self.__source.save(path, format_="ass")
             
     def __check_whisper(self, data):
