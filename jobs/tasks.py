@@ -24,30 +24,13 @@ def render_video_job(job_id: str, session_id: str, user_id: str, bucket_name: st
             "session_id" : session_id
         })
         if session_mongodb is None:
-            mongo_jobs_coll.update_one(
-                {"job_id" : job_id,
-                 "user_id" : user_id
-                 },
-                 {
-                     "$set" : {
-                         "error" : "session does not exist for this job",
-                         "completed" : False
-                     }
-                 })
+            __set_job_failed("session does not exist for this job", mongo_jobs_coll, job_id, user_id)
             return 
         s3_key = session_mongodb.get("s3_key")
         transcript = session_mongodb.get("transcript")
         style_data = session_mongodb.get("session_info")
         if s3_key is None or transcript is None or style_data is None:
-            mongo_jobs_coll.update_one(
-                {"job_id" : job_id,
-                 "user_id" : user_id
-                 },
-                 {"$set" : {
-                     "error" : "missing data to render caption",
-                     "completed" : False 
-                 }}
-            )
+            __set_job_failed("missing data to render caption", mongo_jobs_coll, job_id, user_id)
             return
         suffix = os.path.splitext(s3_key)[1] or ".mp4"
   
@@ -84,15 +67,7 @@ def render_video_job(job_id: str, session_id: str, user_id: str, bucket_name: st
             )
     except Exception as exc:
         if mongo_jobs_coll is not None:
-            mongo_jobs_coll.update_one(
-                {"job_id" : job_id,
-                 "user_id" : user_id
-                 },
-                 {
-                     "$set" : {
-                         "error" : str(exc)
-                     }
-                 })
+            __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id)
         else:
             print("render job failed before the job collection was available")
 
@@ -103,7 +78,18 @@ def render_video_job(job_id: str, session_id: str, user_id: str, bucket_name: st
             os.unlink(temp_video_path)
     
 
-    
+def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
+    mongo_jobs_coll.update_one({
+        "job_id" : job_id,
+        "user_id" : user_id
+    },
+    {
+        "$set" : {
+            "error" : reason,
+            "completed" : False
+        }
+    }
+    )
         
 
      
