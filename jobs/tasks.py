@@ -1,4 +1,5 @@
 from services.subtitle_styler import SubtitleStyler
+from services.client_connector import ClientUtility
 from urllib.parse import quote
 from services.subtitle_embedder import SubtitleEmbedder
 import os 
@@ -13,16 +14,11 @@ def render_video_job(job_id: str, session_id: str, user_id: str, bucket_name: st
     mongo_db = None 
     mongo_jobs_coll = None
     try:
-        mongo_client: MongoClient = MongoClient(os.getenv("MONGO_DB_CONNECTION"))
+        mongo_client: MongoClient = ClientUtility.get_mongo_client()
         mongo_db = mongo_client["caption_ai"]
         mongo_session_coll = mongo_db["user_session_metadata"]
         mongo_jobs_coll = mongo_db["background_jobs_collection"]
-        s3_client = boto3.client(
-                "s3",
-                aws_access_key_id=os.getenv("AWS_S3_ACCESS_KEY"),
-                aws_secret_access_key=os.getenv("AWS_S3_SECRET_KEY"),
-                region_name=os.getenv("AWS_REGION")
-        )
+        s3_client = ClientUtility.get_s3_client() 
         session_mongodb = mongo_session_coll.find_one({
             "user_id" : user_id,
             "session_id" : session_id

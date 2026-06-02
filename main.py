@@ -7,13 +7,14 @@ from db.db import Database
 from routers.auth import AuthRouter, AuthUtility
 from routers.session import SessionRouter
 from routers.transcribe import TranscribeRouter
+from services.client_connector import ClientUtility
 
 load_dotenv()
 
 database = Database()
 auth_utility = AuthUtility()
 
-mongo_client = AsyncIOMotorClient(os.getenv("MONGO_DB_CONNECTION"))
+mongo_client = ClientUtility.get_async_mongo_client()
 mongo_db = mongo_client["caption_ai"]
 
 routers = [
