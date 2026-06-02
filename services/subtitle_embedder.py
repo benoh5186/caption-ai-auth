@@ -47,17 +47,8 @@ class SubtitleEmbedder:
                         process.kill()
                         process.wait()
                         thread.join()
-            try:
-                if os.path.exists(self.__video_path):
-                    os.unlink(self.__video_path)
-                if os.path.exists(self.__subtitle_path):
-                    os.unlink(self.__subtitle_path)
-            except OSError as err:
-                if err is None:
-                    error = err 
-            finally:
-                if error:
-                    raise error 
+            if error:
+                raise error 
                       
 
     def __drain_stderr(self, process, stderr_lines):

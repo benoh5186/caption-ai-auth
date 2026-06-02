@@ -30,6 +30,7 @@ class TranscribeRouter:
         )
         self.__register_routes()
         self.__user_session_metadata = mongo_db["user_session_metadata"]
+        self.__job_info_metadata = mongo_db["job_info_metadata"]
         self.__auth_utility = auth_utility
 
     def __register_routes(self) -> None:
