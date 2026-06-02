@@ -32,15 +32,7 @@ def render_video_job(job_id: str, session_id: str, user_id: str, bucket_name: st
         if s3_key is None or transcript is None or style_data is None:
             __set_job_failed("missing data to render caption", mongo_jobs_coll, job_id, user_id)
             return
-        suffix = os.path.splitext(s3_key)[1] or ".mp4"
-  
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as video_file:
-            temp_video_path = video_file.name 
-            s3_client.download_fileobj(bucket_name, s3_key, video_file)
-        with tempfile.NamedTemporaryFile(delete=False) as subtitle_file:
-            temp_subtitle_path = subtitle_file.name
-            subtitle_styler = SubtitleStyler(transcript)
-            subtitle_styler.implement_styling(style_data, temp_subtitle_path)
+        temp_video_path, temp_subtitle_path = __create_subtitle_and_video_files(s3_client, s3_key, bucket_name, transcript, style_data)
         subtitle_embedder = SubtitleEmbedder(temp_video_path, temp_subtitle_path)
         with tempfile.NamedTemporaryFile(delete=True) as output_path:
             with open(output_path.name, "wb") as f:
@@ -92,4 +84,12 @@ def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
     )
         
 
-     
+def __create_subtitle_and_video_files(s3_client, s3_key, bucket_name, transcript, style_data):
+    suffix = os.path.splitext(s3_key)[1] or ".mp4"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as video_file:
+        s3_client.download_fileobj(bucket_name, s3_key, video_file)
+    with tempfile.NamedTemporaryFile(delete=False) as subtitle_file:
+        temp_subtitle_path = subtitle_file.name
+        subtitle_styler = SubtitleStyler(transcript)
+        subtitle_styler.implement_styling(style_data, temp_subtitle_path)
+    return video_file.name, subtitle_file.name
