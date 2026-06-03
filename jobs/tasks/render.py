@@ -86,10 +86,19 @@ def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
 
 def __create_subtitle_and_video_files(s3_client, s3_key, bucket_name, transcript, style_data):
     suffix = os.path.splitext(s3_key)[1] or ".mp4"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as video_file:
-        s3_client.download_fileobj(bucket_name, s3_key, video_file)
-    with tempfile.NamedTemporaryFile(delete=False) as subtitle_file:
-        temp_subtitle_path = subtitle_file.name
-        subtitle_styler = SubtitleStyler(transcript)
-        subtitle_styler.implement_styling(style_data, temp_subtitle_path)
-    return video_file.name, subtitle_file.name
+    temp_video_path = None
+    temp_subtitle_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as video_file:
+            temp_video_path = video_file.name
+            s3_client.download_fileobj(bucket_name, s3_key, video_file)
+        with tempfile.NamedTemporaryFile(delete=False) as subtitle_file:
+            temp_subtitle_path = subtitle_file.name
+            subtitle_styler = SubtitleStyler(transcript)
+            subtitle_styler.implement_styling(style_data, temp_subtitle_path)
+        return video_file.name, subtitle_file.name
+    except Exception:
+        if temp_subtitle_path and os.path.exists(temp_subtitle_path):
+            os.unlink(temp_subtitle_path)
+        if temp_video_path and os.path.exists(temp_video_path):
+            os.unlink(temp_video_path)

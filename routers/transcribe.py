@@ -13,6 +13,8 @@ import json
 from services.subtitle_styler import SubtitleStyler
 from services.subtitle_embedder import SubtitleEmbedder
 import tempfile 
+from jobs.queue import enqueue_render_job
+from redis import RedisError 
 
 
 
@@ -20,6 +22,7 @@ class TranscribeRouter:
     def __init__(self, mongo_db: AsyncIOMotorClient, auth_utility: AuthUtility) -> None:
         self.__router = APIRouter(prefix="/api/v1/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
+        self.__burned_bucket_name = os.getenv("S3_BURNED_VIDEO")
         self.__transcribe_endpoint = "http://localhost:9000/api/v1/transcribe-video"  
         self.__download_endpoint = "http://localhost:9000/api/v1/download-video"
         self.__s3_client = boto3.client(
@@ -30,7 +33,7 @@ class TranscribeRouter:
         )
         self.__register_routes()
         self.__user_session_metadata = mongo_db["user_session_metadata"]
-        self.__job_info_metadata = mongo_db["job_info_metadata"]
+        self.__job_info_metadata = mongo_db["background_jobs_collection"]
         self.__auth_utility = auth_utility
 
     def __register_routes(self) -> None:
@@ -44,6 +47,45 @@ class TranscribeRouter:
             self.download,
             methods=["POST"],
         )
+    async def export(self, request: Request, session_id):
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=10,
+            window_seconds=60,
+            route_name="/download",
+        )
+        session_payload = self.__auth_utility.require_session(request)
+        job_id = str(uuid.uuid4())
+        user_id = session_payload.get("sub")
+        await self.__job_info_metadata.insert_one({
+            "job_id" : job_id,
+            "user_id" : user_id,
+            "completed" : None,
+            "error" : None 
+        })
+        try:
+            enqueue_render_job(
+                job_id=job_id, 
+                session_id=session_id, 
+                user_id=user_id, 
+                bucket_name=self.__bucket_name, 
+                burned_video_bucket=self.__burned_bucket_name
+            )
+        except RedisError:
+            await self.__job_info_metadata.delete_one({
+                "job_id": job_id,
+                "user_id": user_id,
+            })
+            raise HTTPException(status_code=503, detail="redis queue is unavailable")
+        except Exception:
+            await self.__job_info_metadata.delete_one({
+                "job_id": job_id,
+                "user_id": user_id,
+            })
+            raise HTTPException(status_code=500, detail="failed to enqueue render job.")
+        return {"job_id" : job_id}
+
+        
 
     async def download(self, request: Request, session_id):
         self.__auth_utility.enforce_rate_limit(
