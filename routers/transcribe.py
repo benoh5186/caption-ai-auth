@@ -15,7 +15,7 @@ from services.subtitle_embedder import SubtitleEmbedder
 import tempfile 
 from jobs.queue import enqueue_render_job
 from redis import RedisError 
-
+import datetime
 
 
 class TranscribeRouter:
@@ -60,6 +60,7 @@ class TranscribeRouter:
         await self.__job_info_metadata.insert_one({
             "job_id" : job_id,
             "user_id" : user_id,
+            "created_at" : datetime.datetime.utcnow(),
             "completed" : None,
             "error" : None 
         })

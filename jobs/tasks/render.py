@@ -78,7 +78,8 @@ def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
     {
         "$set" : {
             "error" : reason,
-            "completed" : False
+            "completed" : False,
+            "finished_at" : datetime.datetime.utcnow()
         }
     }
     )
