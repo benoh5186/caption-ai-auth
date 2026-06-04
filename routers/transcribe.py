@@ -5,6 +5,7 @@ from urllib.parse import quote
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 import httpx
 from motor.motor_asyncio import AsyncIOMotorClient
 from routers.auth import AuthUtility
@@ -24,7 +25,6 @@ class TranscribeRouter:
         self.__bucket_name = os.getenv("S3_BUCKET")
         self.__burned_bucket_name = os.getenv("S3_BURNED_VIDEO")
         self.__transcribe_endpoint = "http://localhost:9000/api/v1/transcribe-video"  
-        self.__download_endpoint = "http://localhost:9000/api/v1/download-video"
         self.__s3_client = boto3.client(
             "s3",
             aws_access_key_id=os.getenv("AWS_S3_ACCESS_KEY"),
@@ -43,16 +43,27 @@ class TranscribeRouter:
             methods=["POST"],
         )
         self.__router.add_api_route(
+            "/export/{session_id}",
+            self.export,
+            methods=["POST"]
+        )
+        self.__router.add_api_route(
+            "export-status/{job_id}",
+            self.export_status,
+            methods=["GET"]
+        )
+        self.__router.add_api_route(
             "/download/{session_id}",
             self.download,
             methods=["POST"],
         )
+        
     async def export(self, request: Request, session_id):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=10,
             window_seconds=60,
-            route_name="/download",
+            route_name="/export",
         )
         session_payload = self.__auth_utility.require_session(request)
         job_id = str(uuid.uuid4())
@@ -86,6 +97,32 @@ class TranscribeRouter:
             raise HTTPException(status_code=500, detail="failed to enqueue render job.")
         return {"job_id" : job_id}
 
+    async def export_status(self, request: Request, job_id: str):
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=10,
+            window_seconds=60,
+            route_name="/export-status",
+        )
+        session_payload = self.__auth_utility.require_session(request)
+        job = await self.__job_info_metadata.find_one(
+            {"job_id" : job_id,
+             "user_id" : session_payload.get("sub")
+             }
+        )
+        if job is None:
+            raise HTTPException(status_code=404)
+        status = job["completed"]
+        if status is not None:
+            return  {
+                "completed" : status,
+                "error" : job.get("error", None) 
+            }
+        else:
+            return {
+                "completed" : None,
+                "error" : None 
+            }
         
 
     async def download(self, request: Request, session_id):
