@@ -180,15 +180,28 @@ class TranscribeRouter:
                 "session_id": session_id,
             }
         )
+
+        job_id = str(uuid.uuid4())
+        user_id = session_payload.get("sub")
+        await self.__job_info_metadata.insert_one({
+            "job_id" : job_id,
+            "user_id" : user_id,
+            "created_at" : datetime.datetime.utcnow(),
+            "completed" : None,
+            "error" : None 
+        })
+
         if not session_mongodb:
             raise HTTPException(status_code=404, detail="Session metadata not found.")
-        if not session_mongodb.get("video_id") or not session_mongodb.get("s3_key"):
+        if not session_mongodb.get("s3_key"):
             raise HTTPException(status_code=404, detail="Video metadata not found.")
                
         session_payload = {
-            "video_id": session_mongodb.get("video_id"),
             "bucket": self.__bucket_name,
             "s3_key": session_mongodb.get("s3_key"),
+            "user_id" : user_id,
+            "job_id" : job_id,
+            "session_id" : session_id
         }
 
         try:
@@ -198,19 +211,13 @@ class TranscribeRouter:
                 print("transcribe status:", response.status_code)
                 print("transcribe body:", response.text[:1000])
                 response.raise_for_status()
-                transcript = response.json()
-                await self.__user_session_metadata.update_one(
-                    {"user_id" : payload["sub"],
-                     "session_id" : session_id
-                     },
-                    {"$set": {
-                        "transcript": transcript}}
-                )
-            return transcript
+            return 
         except httpx.HTTPStatusError as exc:
+            print(exc.response.status_code)
+            print(exc.response.content)
             raise HTTPException(
                 status_code=502,
-                detail=f"Transcribe endpoint returned an error: {exc.response.status_code}",
+                detail=f"failed to enqueue job.",
             ) from exc
         except (httpx.RequestError, ValueError) as exc:
             raise HTTPException(
@@ -226,4 +233,3 @@ class TranscribeRouter:
     def __iter_video(streaming_body, chunk_size: int = 1024 * 1024):
         while chunk := streaming_body.read(chunk_size):
             yield chunk
-            
