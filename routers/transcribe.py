@@ -26,12 +26,6 @@ class TranscribeRouter:
         self.__bucket_name = os.getenv("S3_BUCKET")
         self.__burned_bucket_name = os.getenv("S3_BURNED_VIDEO")
         self.__transcribe_endpoint = "http://localhost:9000/api/v1/transcribe-video"  
-        self.__s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=os.getenv("AWS_S3_ACCESS_KEY"),
-            aws_secret_access_key=os.getenv("AWS_S3_SECRET_KEY"),
-            region_name=os.getenv("AWS_REGION"),
-        )
         self.__register_routes()
         self.__user_session_metadata = mongo_db["user_session_metadata"]
         self.__job_info_metadata = mongo_db["background_jobs_collection"]
@@ -54,9 +48,14 @@ class TranscribeRouter:
             methods=["GET"]
         )
         self.__router.add_api_route(
-            "/download/{session_id}",
+            "/download/{job_id}",
             self.download,
             methods=["POST"],
+        )
+        self.__router.add_api_router(
+            "/transcript/{job_id}",
+            self.transcript,
+            methods=["POST"]
         )
 
     async def export(self, request: Request, session_id):
@@ -125,7 +124,7 @@ class TranscribeRouter:
                 "error" : None 
             }
         
-    async def download(self, request: Request, session_id, job_id):
+    async def download(self, request: Request, job_id):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=10,
