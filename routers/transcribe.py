@@ -139,11 +139,6 @@ class TranscribeRouter:
              })
         if export_job is None:
             raise HTTPException(status_code=404)
-        if export_job.get("completed") is None:
-            raise HTTPException(status_code=409, detail="Export is not ready yet.")
-
-        if export_job.get("completed") is False:
-            raise HTTPException(status_code=409, detail="Export failed.")
         
         burned_video_s3 = export_job.get("result_s3_key")
         if not burned_video_s3:
@@ -224,6 +219,22 @@ class TranscribeRouter:
                 status_code=502,
                 detail=f"Failed to parse transcribe endpoint response: {exc}",
             ) from exc
+        
+    async def transcript(self, request: Request, session_id):
+        self.__auth_utility.enforce_rate_limit(
+            request=request,
+            max_requests=2,
+            window_seconds=60,
+            route_name="/transcript",
+        )
+        session_payload = self.__auth_utility.require_session(request)
+        session_doc = await self.__user_session_metadata.find_one(
+            {"user_id" : session_payload.get("sub"), 
+             "session_id" : session_id})
+        transcript = session_doc["transcript"]
+        if transcript is None:
+            return HTTPException(status_code=404)
+        return transcript 
 
     @property
     def router(self) -> APIRouter:
