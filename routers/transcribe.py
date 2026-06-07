@@ -205,7 +205,7 @@ class TranscribeRouter:
                 print("transcribe status:", response.status_code)
                 print("transcribe body:", response.text[:1000])
                 response.raise_for_status()
-            return 
+            return {"job_id" : job_id}
         except httpx.HTTPStatusError as exc:
             print(exc.response.status_code)
             print(exc.response.content)
