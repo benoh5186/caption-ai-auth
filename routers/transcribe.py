@@ -52,7 +52,7 @@ class TranscribeRouter:
             self.download,
             methods=["POST"],
         )
-        self.__router.add_api_router(
+        self.__router.add_api_route(
             "/transcript/{job_id}",
             self.transcript,
             methods=["POST"]

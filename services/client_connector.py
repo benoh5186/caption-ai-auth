@@ -1,8 +1,11 @@
 import os
-
 import boto3
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 class ClientUtility():
