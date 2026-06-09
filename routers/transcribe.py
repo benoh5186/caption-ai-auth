@@ -43,7 +43,7 @@ class TranscribeRouter:
             methods=["POST"]
         )
         self.__router.add_api_route(
-            "export-status/{job_id}",
+            "/export-status/{job_id}",
             self.export_status,
             methods=["GET"]
         )
@@ -111,6 +111,7 @@ class TranscribeRouter:
              }
         )
         if job is None:
+            print("not found")
             raise HTTPException(status_code=404)
         status = job["completed"]
         if status is not None:
@@ -132,7 +133,7 @@ class TranscribeRouter:
             route_name="/download",
         )
         session_payload = self.__auth_utility.require_session(request)
-        export_job = self.__job_info_metadata.find_one(
+        export_job = await self.__job_info_metadata.find_one(
             {"job_id" : job_id,
              "user_id" : session_payload.get("sub")
              })
@@ -149,10 +150,10 @@ class TranscribeRouter:
         filename = quote(os.path.basename(burned_video_s3))
 
         return StreamingResponse(
-            self.__iter_video(s3_object["Body"],
+            self.__iter_video(s3_object["Body"]),
             media_type="video/mp4",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-        )
+        
         )
         
 

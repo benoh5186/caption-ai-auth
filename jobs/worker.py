@@ -1,5 +1,5 @@
 from jobs.redis_conn import redis_conn
-from rq import Worker
+from rq import Worker, SimpleWorker
 
-worker = Worker(['default'], connection=redis_conn)
+worker = SimpleWorker(['default'], connection=redis_conn)
 worker.work()
