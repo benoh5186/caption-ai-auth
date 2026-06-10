@@ -108,7 +108,7 @@ class SessionRouter:
     async def upload_video(self, request: Request, session_id: str, video: UploadFile = File(...)):
         self.__auth_utility.enforce_rate_limit(
             request=request,
-            max_requests=1,
+            max_requests=5,
             window_seconds=30,
             route_name="/load-session-video",
         )

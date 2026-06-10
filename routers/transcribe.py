@@ -53,7 +53,7 @@ class TranscribeRouter:
             methods=["POST"],
         )
         self.__router.add_api_route(
-            "/transcript/{job_id}",
+            "/transcript/{session_id}",
             self.transcript,
             methods=["POST"]
         )
@@ -161,17 +161,17 @@ class TranscribeRouter:
     async def transcribe(self, request: Request, session_id):
         self.__auth_utility.enforce_rate_limit(
             request=request,
-            max_requests=2,
+            max_requests=5,
             window_seconds=60,
             route_name="/transcribe",
         )
-        payload = self.__auth_utility.require_session(request)
+        session_payload = self.__auth_utility.require_session(request)
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
         
         session_mongodb = await self.__user_session_metadata.find_one(
             {
-                "user_id": payload.get("sub"),
+                "user_id": session_payload.get("sub"),
                 "session_id": session_id,
             }
         )
