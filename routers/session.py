@@ -99,7 +99,7 @@ class SessionRouter:
                 "user_id": session_payload.get("sub"),
                 "session_id": session_id
             },
-            {"_id": 0, "transcript" : 1, "session_info" : 1, "title" : 1},
+            {"_id": 0, "transcript" : 1, "session_info" : 1, "title" : 1, "job_id" : 1},
         )
         if session is None:
             return HTTPException(status_code=404, detail="no such session")
@@ -225,7 +225,8 @@ class SessionRouter:
                 "session_id" : session_id,
                 "title" : "Untitled Session",
                 "transcript" : None,
-                "session_info" : None
+                "session_info" : None,
+                "job_id" : None 
             })
             return JSONResponse(
             status_code=201,

@@ -43,7 +43,7 @@ class TranscribeRouter:
             methods=["POST"]
         )
         self.__router.add_api_route(
-            "/export-status/{job_id}",
+            "/export-status/{job_id}/{session_id}",
             self.export_status,
             methods=["GET"]
         )
@@ -75,6 +75,10 @@ class TranscribeRouter:
             "completed" : None,
             "error" : None 
         })
+        await self.__user_session_metadata.update_one(
+            {"user_id" : user_id, "session_id" : session_id},
+            { "$set" : {"job_id" : job_id}}
+        )
         try:
             enqueue_render_job(
                 job_id=job_id, 
@@ -97,7 +101,7 @@ class TranscribeRouter:
             raise HTTPException(status_code=500, detail="failed to enqueue render job.")
         return {"job_id" : job_id}
 
-    async def export_status(self, request: Request, job_id: str):
+    async def export_status(self, request: Request, job_id: str, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
             max_requests=10,
@@ -112,6 +116,10 @@ class TranscribeRouter:
         )
         if job is None:
             print("not found")
+            await self.__user_session_metadata.update_one(
+                {"user_id" : session_payload.get("sub"), "session_id" : session_id},
+                {"$set", {"job_id" : None}}
+            )
             raise HTTPException(status_code=404)
         status = job["completed"]
         if status is not None:
@@ -185,6 +193,11 @@ class TranscribeRouter:
             "completed" : None,
             "error" : None 
         })
+        
+        await self.__user_session_metadata.update_one(
+            {"user_id" : user_id, "session_id" : session_id},
+            {"$set" : {"job_id" : job_id}}
+        )
 
         if not session_mongodb:
             raise HTTPException(status_code=404, detail="Session metadata not found.")
