@@ -11,6 +11,7 @@ import uuid
 import subprocess
 import tempfile
 
+
 class SessionRouter:
     def __init__(self, user_sessions: Database, mongo_db: AsyncIOMotorClient,auth_utility: AuthUtility):
         self.__router = APIRouter(prefix="/api/v1/session", tags=["session"])
@@ -239,11 +240,23 @@ class SessionRouter:
     async def delete_session(self, request: Request, session_id: str):
         self.__auth_utility.enforce_rate_limit(
             request=request,
-            max_requests=1,
+            max_requests=2,
             window_seconds=5,
             route_name="/delete-session",
         )
         session_payload = self.__auth_utility.require_session(request)
+        user_session = await self.__user_session_metadata.find_one(
+            {"user_id" : session_payload.get("sub"), "session_id" : session_id},
+            {"_id" : 0, "s3_key" : 1}
+            )
+        if user_session is not None:
+            try:
+                await self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("s3_key"))
+            except (ClientError, BotoCoreError) as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"failed to delete session files from storage: {exc}",
+                )
         await self.__user_session_metadata.delete_one({
             "user_id" : session_payload.get("sub"),
             "session_id" : session_id
