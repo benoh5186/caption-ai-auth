@@ -244,6 +244,10 @@ class TranscribeRouter:
         session_doc = await self.__user_session_metadata.find_one(
             {"user_id" : session_payload.get("sub"), 
              "session_id" : session_id})
+        await self.__user_session_metadata.update_one(
+            {"user_id" : session_payload.get("sub"), "session_id" : session_id},
+            {"$set" : {"job_id" : None}}
+            )
         transcript = session_doc["transcript"]
         if transcript is None:
             return HTTPException(status_code=404)
