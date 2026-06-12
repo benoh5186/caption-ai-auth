@@ -249,14 +249,15 @@ class SessionRouter:
             {"user_id" : session_payload.get("sub"), "session_id" : session_id},
             {"_id" : 0, "s3_key" : 1, "thumbnail_s3_key" : 1}
             )
-        if user_session is not None:
+        if user_session:
             try:
-                self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("s3_key"))
-                self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("thumbnail_s3_key"))
-            except (ClientError, BotoCoreError) as exc:
+                await self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("s3_key"))
+                if user_session.get("thumbnail_s3_key", None) is not None:
+                    await self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("thumbnail_s3_key"))
+            except (ClientError, BotoCoreError):
                 raise HTTPException(
                     status_code=502,
-                    detail=f"failed to delete session files from storage: {exc}",
+                    detail=f"failed to delete session files from storage",
                 )
         await self.__user_session_metadata.delete_one({
             "user_id" : session_payload.get("sub"),
