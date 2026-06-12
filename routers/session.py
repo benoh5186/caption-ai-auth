@@ -251,9 +251,9 @@ class SessionRouter:
             )
         if user_session:
             try:
-                await self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("s3_key"))
+                self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("s3_key"))
                 if user_session.get("thumbnail_s3_key", None) is not None:
-                    await self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("thumbnail_s3_key"))
+                    self.__s3_client.delete_object(Bucket=self.__bucket_name, Key=user_session.get("thumbnail_s3_key"))
             except (ClientError, BotoCoreError):
                 raise HTTPException(
                     status_code=502,
