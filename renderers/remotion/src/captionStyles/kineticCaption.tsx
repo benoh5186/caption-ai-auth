@@ -17,7 +17,7 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
             style={styleData}
         > 
             {currentSegment?.words.map((wordData) => {
-                if (wordData.start >= videoCurrentTime && wordData.end <= videoCurrentTime) {
+                if (wordData.start <= videoCurrentTime && wordData.end >= videoCurrentTime) {
                     return <span className="word active">{wordData.word}</span>
                 } else {
                     return <span className="word">{wordData.word}</span>
