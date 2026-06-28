@@ -13,5 +13,11 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
     })
     const styleData = getStyleData(segmentStyles, currentSegment?.id)
 
+    return (
+        <AbsoluteFill
+        style={styleData}
+        >
 
+        </AbsoluteFill>
+    )
 }
