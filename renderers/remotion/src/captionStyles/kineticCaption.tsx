@@ -1,5 +1,6 @@
 import { TimedCaptionProp } from "../types/captionProp";
 import { AbsoluteFill } from "remotion";
+
 export function KineticWordCaption({segment, styleData, videoCurrentTime}: TimedCaptionProp) {
     return (
         <AbsoluteFill
