@@ -4,9 +4,8 @@ import { useVideoConfig, useCurrentFrame } from "remotion";
 import { getStyleData } from "../utils/styleData";
 
 export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
-    const {fps, durationInFrames} = useVideoConfig()
+    const {fps} = useVideoConfig()
     const frame = useCurrentFrame()
-    const videoLength = durationInFrames / fps 
     const videoCurrentTime = frame / fps 
     const currentSegment = transcript?.segments.find((segment) => {
         return segment.start <= videoCurrentTime && segment.end >= videoCurrentTime
@@ -15,9 +14,15 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
 
     return (
         <AbsoluteFill
-        style={styleData}
-        >
-
+            style={styleData}
+        > 
+            {currentSegment?.words.map((wordData) => {
+                if (wordData.start >= videoCurrentTime && wordData.end <= videoCurrentTime) {
+                    return <span className="word active">{wordData.word}</span>
+                } else {
+                    return <span className="word">{wordData.word}</span>
+                }
+            })}
         </AbsoluteFill>
     )
 }
