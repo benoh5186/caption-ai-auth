@@ -3,5 +3,6 @@ import { SegmentStyles } from "./segmentStyles";
 
 export type CaptionData = {
     transcript: Transcript,
-    segmentStyles: SegmentStyles
+    segmentStyles: SegmentStyles,
+    videoSrc: string 
 }

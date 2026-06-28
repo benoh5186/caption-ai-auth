@@ -1,13 +1,14 @@
 import { CaptionData } from "../types/captionData";
 import { Segment } from "../types/transcript";
 import { SegmentStyles } from "../types/segmentStyles";
-import { useVideoConfig, useCurrentFrame } from "remotion";
+import { useVideoConfig, useCurrentFrame, AbsoluteFill } from "remotion";
 import { getStyleData } from "../utils/styleData";
 import { KineticWordCaption } from "./kineticCaption";
 import { DefaultCaption } from "./defaultCaption";
+import { OffthreadVideo } from "remotion";
 
 
-export function CaptionRenderer({transcript, segmentStyles}: CaptionData) {
+export function CaptionRenderer({transcript, segmentStyles, videoSrc}: CaptionData) {
     const {fps} = useVideoConfig()
     const frame = useCurrentFrame()
     const videoCurrentTime = frame / fps
@@ -18,7 +19,17 @@ export function CaptionRenderer({transcript, segmentStyles}: CaptionData) {
         return null 
     }
     const styleData = getStyleData(segmentStyles, currentSegment.id)
-    return getCaptionComponent(currentSegment, styleData, segmentStyles, videoCurrentTime)
+    const captionComponent = getCaptionComponent(currentSegment, styleData, segmentStyles, videoCurrentTime)
+    return (
+        <AbsoluteFill>
+            <AbsoluteFill>
+                <OffthreadVideo src={videoSrc} />
+            </AbsoluteFill>
+            <AbsoluteFill>
+                {captionComponent}
+            </AbsoluteFill>
+        </AbsoluteFill>
+    )
 }
 
 function getCaptionComponent(segment: Segment, styleData: Record<string, unknown>, segmentStyles: SegmentStyles, videoCurrentTime: number) {
