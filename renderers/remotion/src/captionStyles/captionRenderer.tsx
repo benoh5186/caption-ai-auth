@@ -4,6 +4,7 @@ import { SegmentStyles } from "../types/segmentStyles";
 import { useVideoConfig, useCurrentFrame } from "remotion";
 import { getStyleData } from "../utils/styleData";
 import { KineticWordCaption } from "./kineticCaption";
+import { DefaultCaption } from "./defaultCaption";
 
 
 export function CaptionRenderer({transcript, segmentStyles}: CaptionData) {
@@ -28,8 +29,12 @@ function getCaptionComponent(segment: Segment, styleData: Record<string, unknown
                         styleData={styleData}
                         videoCurrentTime={videoCurrentTime}/> 
         case "defaultCaption" :
-            return 
+            return <DefaultCaption 
+                        segment={segment}
+                        styleData={styleData}/> 
         default:
-            return 
+            return <DefaultCaption 
+                        segment={segment}
+                        styleData={styleData}/> 
     }
 }
