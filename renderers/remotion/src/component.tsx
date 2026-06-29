@@ -1,5 +1,6 @@
 import { InputProps } from "./types/inputProps"
 import { CalculateMetadataFunction, Composition } from "remotion"
+import { getMediaMetadata } from "./utils/mediaMetadata";
 import { CaptionRenderer } from "./captionStyles/captionRenderer";
 import { CaptionData } from "./types/captionData";
 
@@ -19,8 +20,14 @@ const defaultCaptionData = {
 } satisfies CaptionData;
 
 const calculateVideoMetadata: CalculateMetadataFunction<CaptionData> = 
-    async ({props, defaultProps, abortSignal, isRendering}) => {
-
+    async ({props}) => {
+        const {durationInSeconds, displayWidth, displayHeight} = await getMediaMetadata(props.videoSrc)
+        const durationInFrames = Math.ceil(durationInSeconds * fps)
+        return {
+            durationInFrames: durationInFrames,
+            width: displayWidth,
+            height: displayHeight
+        }
 }
 
 export const RemotionRoot = () => {
