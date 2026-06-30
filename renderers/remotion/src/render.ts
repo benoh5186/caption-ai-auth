@@ -12,8 +12,22 @@ const readStdin = async (): Promise<string> => {
     return data 
 }
 
+const isObj = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === "object" && value !== null
+}
+
+const isRenderRequest = (request: unknown): request is RenderRequest => {
+    if (!isObj(request)) return false 
+    return (isObj(request.inputProps) && typeof request.outputLocation === "string")
+}
+
+
+
 const main = async () => {
     const request: RenderRequest = JSON.parse(await readStdin())
+    if (!isRenderRequest(request)) {
+        throw Error("invalid prop argument")
+    }
 
     const serveUrl = resolve(__dirname, "..", "dist/remotion-bundle")
     const composition = await selectComposition(
