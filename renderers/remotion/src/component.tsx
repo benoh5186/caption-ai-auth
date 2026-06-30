@@ -1,4 +1,3 @@
-import { InputProps } from "./types/inputProps"
 import { CalculateMetadataFunction, Composition } from "remotion"
 import { getMediaMetadata } from "./utils/mediaMetadata";
 import { CaptionRenderer } from "./captionStyles/captionRenderer";

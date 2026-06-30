@@ -1,4 +1,1 @@
 import {Composition} from "remotion"
-
-
-
