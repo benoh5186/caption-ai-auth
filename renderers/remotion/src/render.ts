@@ -35,5 +35,7 @@ const main = async () => {
 
 main().catch((err) => {
     console.log(err)
+    const message = err instanceof Error ? err.message : String(err)
+    process.stderr.write(message)
     process.exitCode = 1
 })
