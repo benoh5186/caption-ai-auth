@@ -13,21 +13,28 @@ const readStdin = async (): Promise<string> => {
     return data 
 }
 
-const request: RenderRequest = JSON.parse(await readStdin())
+const main = async () => {
+    const request: RenderRequest = JSON.parse(await readStdin())
 
-const bundled = await bundle({entryPoint: resolve("./src/index.ts")})
-const composition = await selectComposition(
-    {
+    const bundled = await bundle({entryPoint: resolve("./src/index.ts")})
+    const composition = await selectComposition(
+        {
+            serveUrl: bundled,
+            id: "main",
+            inputProps: request.inputProps
+        }
+    )
+
+    await renderMedia({
+        composition: composition,
         serveUrl: bundled,
-        id: "main",
+        codec: 'h264',
+        outputLocation: request.outputLocation,
         inputProps: request.inputProps
-    }
-)
+    })
+}
 
-await renderMedia({
-    composition: composition,
-    serveUrl: bundled,
-    codec: 'h264',
-    outputLocation: request.outputLocation,
-    inputProps: request.inputProps
+main().catch((err) => {
+    console.log(err)
+    process.exitCode = 1
 })
