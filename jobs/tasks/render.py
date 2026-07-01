@@ -7,6 +7,76 @@ import tempfile
 from pymongo import MongoClient
 import boto3
 import datetime 
+import subprocess
+
+
+def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str, burned_video_bucket: str):
+    mongo_db = None 
+    mongo_jobs_coll = None
+    try:
+        mongo_client: MongoClient = ClientUtility.get_mongo_client()
+        mongo_db = mongo_client["caption_ai"]
+        mongo_session_coll = mongo_db["user_session_metadata"]
+        mongo_jobs_coll = mongo_db["background_jobs_collection"]
+        s3_client = ClientUtility.get_s3_client() 
+        session_mongodb = mongo_session_coll.find_one({
+            "user_id" : user_id,
+            "session_id" : session_id
+        })
+        if session_mongodb is None:
+            __set_job_failed("session does not exist for this job", mongo_jobs_coll, job_id, user_id)
+            return 
+        s3_key = session_mongodb.get("s3_key")
+        transcript = session_mongodb.get("transcript")
+        style_data = session_mongodb.get("session_info")
+        if s3_key is None or transcript is None or style_data is None:
+            __set_job_failed("missing data to render caption", mongo_jobs_coll, job_id, user_id)
+            return
+        video_url = s3_client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={'Bucket' : bucket_name, 'Key' : s3_key},
+            ExpiresIn=3600
+        )
+        with tempfile.NamedTemporaryFile(delete=True) as output_path:
+            render_request = {
+                                "inputProps": 
+                                    {"transcript": transcript, "segmentStyles": style_data, "videoSrc": video_url},
+                                "outputLocation":
+                                    output_path.name
+                                }
+
+            subprocess.run(
+                ["npx", "tsx", "src/render.ts"],
+                input=render_request,
+                check=True
+            )
+            result_s3_key = f"exports/{user_id}/{session_id}/{job_id}.mp4"
+            s3_client.upload_file(
+                output_path.name,
+                burned_video_bucket,
+                result_s3_key,
+                ExtraArgs={"ContentType": "video/mp4"}
+            )
+            mongo_jobs_coll.update_one(
+                {"job_id" : job_id,
+                 "user_id" : user_id
+                 },
+                 {
+                     "$set" : {
+                         "completed" : True, 
+                         "finished_at" : datetime.datetime.utcnow(),
+                         "result_s3_key" : result_s3_key
+                     }
+                 }
+            )
+
+    except Exception as exc:
+        if mongo_jobs_coll is not None:
+            __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id)
+        else:
+            print("render job failed before the job collection was available") 
+    
+
 
 def render_video_job(job_id: str, session_id: str, user_id: str, bucket_name: str, burned_video_bucket: str):
     temp_subtitle_path = None 
