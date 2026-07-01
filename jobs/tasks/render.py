@@ -5,9 +5,9 @@ from services.subtitle_embedder import SubtitleEmbedder
 import os 
 import tempfile
 from pymongo import MongoClient
-import boto3
 import datetime 
 import subprocess
+import json 
 
 
 def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str, burned_video_bucket: str):
@@ -37,7 +37,7 @@ def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str,
             Params={'Bucket' : bucket_name, 'Key' : s3_key},
             ExpiresIn=3600
         )
-        with tempfile.NamedTemporaryFile(delete=True) as output_path:
+        with tempfile.NamedTemporaryFile(delete=True, suffix=".mp4") as output_path:
             render_request = {
                                 "inputProps": 
                                     {"transcript": transcript, "segmentStyles": style_data, "videoSrc": video_url},
@@ -46,8 +46,9 @@ def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str,
                                 }
 
             subprocess.run(
-                ["npx", "tsx", "src/render.ts"],
-                input=render_request,
+                ["npx", "tsx", "renderers/remotion/src/render.ts"],
+                input=json.dumps(render_request),
+                text=True,
                 check=True
             )
             result_s3_key = f"exports/{user_id}/{session_id}/{job_id}.mp4"
@@ -71,6 +72,7 @@ def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str,
             )
 
     except Exception as exc:
+        print(f"FAILED: {exc}")
         if mongo_jobs_coll is not None:
             __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id)
         else:
