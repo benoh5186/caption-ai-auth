@@ -32,7 +32,7 @@ export function CaptionRenderer({transcript, segmentStyles, videoSrc}: CaptionDa
     )
 }
 
-function getCaptionComponent(segment: Segment, styleData: Record<string, unknown>, segmentStyles: SegmentStyles, videoCurrentTime: number) {
+function getCaptionComponent(segment: Segment, styleData: Record<string, string | number>, segmentStyles: SegmentStyles, videoCurrentTime: number) {
     switch (segmentStyles.captionStyle) {
         case "kineticWordCaption" :
             return <KineticWordCaption

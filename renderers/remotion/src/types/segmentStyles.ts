@@ -1,6 +1,6 @@
 
 export type SegmentStyles = {
     captionStyle: string,
-    globalStyle: Record<string, unknown>,
-    segmentStyles: Record<number, Record<string, unknown>>
+    globalStyle: Record<string, string | number>,
+    segmentStyles: Record<number, Record<string, string | number>>
 }

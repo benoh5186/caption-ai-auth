@@ -1,0 +1,6 @@
+.word.active {
+  padding: 0.05em 0.18em;
+  border-radius: 0.18em;
+  text-shadow: none;
+  transform: scale(1.12);
+}
