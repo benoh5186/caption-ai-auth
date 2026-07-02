@@ -1,10 +1,8 @@
 import { Segment } from "./transcript"
+import { Transcript } from "./transcript";
+import { SegmentStyles } from "./segmentStyles";
 
-export type BaseCaptionProp = {
-    segment: Segment,
-    styleData: Record<string, number | string >
-}
-
-export type TimedCaptionProp = BaseCaptionProp & {
-    videoCurrentTime: number
+export type CaptionProp = {
+    transcript: Transcript,
+    segmentStyles: SegmentStyles,
 }

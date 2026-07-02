@@ -1,5 +1,5 @@
 import { CaptionData } from "../types/captionData";
-import { Segment } from "../types/transcript";
+import { Segment, Transcript } from "../types/transcript";
 import { SegmentStyles } from "../types/segmentStyles";
 import { useVideoConfig, useCurrentFrame, AbsoluteFill } from "remotion";
 import { getStyleData } from "../utils/styleData";
@@ -9,43 +9,30 @@ import { OffthreadVideo } from "remotion";
 
 
 export function CaptionRenderer({transcript, segmentStyles, videoSrc}: CaptionData) {
-    const {fps} = useVideoConfig()
-    const frame = useCurrentFrame()
-    const videoCurrentTime = frame / fps
-    const currentSegment = transcript?.segments.find((segment) => {
-        return segment.start <= videoCurrentTime && segment.end >= videoCurrentTime
-    })
-    if (!currentSegment) {
-        return null 
-    }
-    const styleData = getStyleData(segmentStyles, currentSegment.id)
-    const captionComponent = getCaptionComponent(currentSegment, styleData, segmentStyles, videoCurrentTime)
+    const captionComponent = getCaptionComponent(transcript, segmentStyles)
     return (
         <AbsoluteFill>
             <AbsoluteFill>
                 <OffthreadVideo src={videoSrc} />
             </AbsoluteFill>
-            <AbsoluteFill>
-                {captionComponent}
-            </AbsoluteFill>
+            {captionComponent}
         </AbsoluteFill>
     )
 }
 
-function getCaptionComponent(segment: Segment, styleData: Record<string, string | number>, segmentStyles: SegmentStyles, videoCurrentTime: number) {
+function getCaptionComponent(transcript: Transcript, segmentStyles: SegmentStyles) {
     switch (segmentStyles.captionStyle) {
         case "kineticWordCaption" :
             return <KineticWordCaption
-                        segment={segment}
-                        styleData={styleData}
-                        videoCurrentTime={videoCurrentTime}/> 
+                        transcript={transcript}
+                        segmentStyles={segmentStyles}/> 
         case "defaultCaption" :
             return <DefaultCaption 
-                        segment={segment}
-                        styleData={styleData}/> 
+                        transcript={transcript}
+                        segmentStyles={segmentStyles}/> 
         default:
             return <DefaultCaption 
-                        segment={segment}
-                        styleData={styleData}/> 
+                        transcript={transcript}
+                        segmentStyles={segmentStyles}/> 
     }
 }

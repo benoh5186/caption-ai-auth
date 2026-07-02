@@ -1,9 +1,21 @@
-import { TimedCaptionProp } from "../types/captionProp";
-import { AbsoluteFill } from "remotion";
+import { CaptionProp } from "../types/captionProp";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import { getStyleData } from "../utils/styleData";
 import "./css/caption.css"
 import "./css/kineticCaption.css"
 
-export function KineticWordCaption({segment, styleData, videoCurrentTime}: TimedCaptionProp) {
+export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
+    const {fps} = useVideoConfig()
+    const frame = useCurrentFrame()
+    const videoCurrentTime = frame / fps 
+    const segment = transcript?.segments.find((seg) => {
+            return seg.start <= videoCurrentTime && seg.end >= videoCurrentTime
+        })
+    if (!segment) {
+        return null 
+    }
+    const styleData = getStyleData(segmentStyles, segment.id)
+
     return (
         <AbsoluteFill
             style={styleData}
