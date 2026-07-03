@@ -17,7 +17,7 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
     const styleData = getStyleData(segmentStyles, segment.id)
 
     return (
-        <AbsoluteFill
+        <div
             style={styleData}
             className="subtitle"
         > 
@@ -28,7 +28,7 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
                     return <span className="word">{wordData.word}</span>
                 }
             })}
-        </AbsoluteFill>
+        </div>
     )
 }
 

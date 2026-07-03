@@ -15,9 +15,9 @@ export function DefaultCaption({transcript, segmentStyles}: CaptionProp) {
     }
     const styleData = getStyleData(segmentStyles, segment.id)
 
-    return (<AbsoluteFill style={styleData} className="subtitle">
+    return (<div style={styleData} className="subtitle">
                 {segment.words.map((wordData) => {
                         return <span className="word">{wordData.word}</span>
                     })}
-            </AbsoluteFill>)
+            </div>)
 }

@@ -1,5 +1,14 @@
 .subtitle {
+    position: absolute;
+    left: 50%;
+    bottom: 10%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
     gap: 0.25em;
+    width: 90%;
+    text-align: center;
 }
 .word {
     display: inline-block;
