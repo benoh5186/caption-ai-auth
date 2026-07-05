@@ -20,21 +20,19 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
     
     function getCurrentWordColor(wordData: Word): string | null {
         if (wordData.end <= wordData.start) return null 
-        const enterWord = interpolate(videoCurrentTime, [wordData.start, wordData.end], [0, 1], {extrapolateLeft: "clamp", "extrapolateRight" : "clamp"})
-        const exitWord = interpolate(videoCurrentTime, [wordData.start, wordData.end], [1, 0], {extrapolateLeft: "clamp", "extrapolateRight" : "clamp"})
-        const wordTransition = Math.min(enterWord, exitWord)
-        const color = interpolateColors(wordTransition, [0, 1], [styleData.backgroundColor as string, getCurrentWordStyle(styleData.backgroundColor as string).backgroundColor])
+        const wordTransition = interpolate(videoCurrentTime, [wordData.start, wordData.end], [0, 1], {extrapolateLeft: "clamp", "extrapolateRight" : "clamp"})
+        const color = interpolateColors(wordTransition, [0, 1], [withOpacity(styleData.backgroundColor as string, 0), styleData.backgroundColor as string])
         return color 
     }
 
     return (
         <div
-            style={styleData}
+            style={{...styleData, backgroundColor: "transparent"}}
             className="subtitle"
         > 
             {segment?.words.map((wordData) => {
                 const colorFetch = getCurrentWordColor(wordData)
-                const color = typeof colorFetch === "string" ? colorFetch : getCurrentWordStyle(styleData.backgroundColor as string).backgroundColor
+                const color = typeof colorFetch === "string" ? colorFetch : styleData.backgroundColor as string
                 if (wordData.start <= videoCurrentTime && wordData.end >= videoCurrentTime) {
                     return <span className="word active" style={{backgroundColor : color}}>{wordData.word}</span>
                 } else {
@@ -45,22 +43,9 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
     )
 }
 
-function getCurrentWordStyle(color: string) {
-    const backgroundColor = getContrastColor(color)
+function withOpacity(color: string, opacity: number): string {
+    const hex = color.replace("#", "").slice(0, 6);
+    const alpha = Math.round(opacity * 255).toString(16).padStart(2, "0")
+    return `#${hex}${alpha}`
 
-    return {
-        backgroundColor: backgroundColor
-    }
-}
-
-function getContrastColor(hexColor: string) {
-    const hex = hexColor.replace("#", "");
-
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-
-    return brightness > 128 ? "#000000" : "#ffffff";
 }
