@@ -4,6 +4,7 @@ import { Easing, interpolate, interpolateColors,useCurrentFrame, useVideoConfig 
 import { getStyleData } from "../utils/styleData";
 import "./css/caption.css"
 import "./css/kineticCaption.css"
+import { Word } from "../types/transcript";
 
 export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
     const {fps} = useVideoConfig()
@@ -16,10 +17,15 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
         return null 
     }
     const styleData = getStyleData(segmentStyles, segment.id)
-    const enterWord = interpolate(videoCurrentTime, [segment.start, segment.end], [0, 1], {extrapolateLeft: "clamp", "extrapolateRight" : "clamp"})
-    const exitWord = interpolate(videoCurrentTime, [segment.start, segment.end], [1, 0])
-    const wordTransition = Math.min(enterWord, exitWord)
-    const color = interpolateColors(wordTransition, [0, 1], [styleData.backgroundColor as string, getCurrentWordStyle(styleData.backgroundColor as string).backgroundColor])
+    
+    function getCurrentWordColor(wordData: Word): string | null {
+        if (wordData.end <= wordData.start) return null 
+        const enterWord = interpolate(videoCurrentTime, [wordData.start, wordData.end], [0, 1], {extrapolateLeft: "clamp", "extrapolateRight" : "clamp"})
+        const exitWord = interpolate(videoCurrentTime, [wordData.start, wordData.end], [1, 0], {extrapolateLeft: "clamp", "extrapolateRight" : "clamp"})
+        const wordTransition = Math.min(enterWord, exitWord)
+        const color = interpolateColors(wordTransition, [0, 1], [styleData.backgroundColor as string, getCurrentWordStyle(styleData.backgroundColor as string).backgroundColor])
+        return color 
+    }
 
     return (
         <div
@@ -27,6 +33,8 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
             className="subtitle"
         > 
             {segment?.words.map((wordData) => {
+                const colorFetch = getCurrentWordColor(wordData)
+                const color = typeof colorFetch === "string" ? colorFetch : getCurrentWordStyle(styleData.backgroundColor as string).backgroundColor
                 if (wordData.start <= videoCurrentTime && wordData.end >= videoCurrentTime) {
                     return <span className="word active" style={{backgroundColor : color}}>{wordData.word}</span>
                 } else {
