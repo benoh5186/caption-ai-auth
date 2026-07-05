@@ -1,6 +1,7 @@
 import { SegmentStyles } from "../types/segmentStyles";
+import React from "react";
 
-export function getStyleData(segmentStyles: SegmentStyles, segmentId: number) : Record<string, string | number> {
+export function getStyleData(segmentStyles: SegmentStyles, segmentId: number) : React.CSSProperties {
 
     return {
         ...segmentStyles.globalStyle,

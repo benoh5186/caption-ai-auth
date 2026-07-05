@@ -1,5 +1,6 @@
 import { CaptionProp } from "../types/captionProp";
-import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import React from "react";
+import { Easing, interpolate, interpolateColors,useCurrentFrame, useVideoConfig } from "remotion";
 import { getStyleData } from "../utils/styleData";
 import "./css/caption.css"
 import "./css/kineticCaption.css"
@@ -15,6 +16,10 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
         return null 
     }
     const styleData = getStyleData(segmentStyles, segment.id)
+    const enterWord = interpolate(videoCurrentTime, [segment.start, segment.end], [0, 1], {extrapolateLeft: "clamp", "extrapolateRight" : "clamp"})
+    const exitWord = interpolate(videoCurrentTime, [segment.start, segment.end], [1, 0])
+    const wordTransition = Math.min(enterWord, exitWord)
+    const color = interpolateColors(wordTransition, [0, 1], [styleData.backgroundColor as string, getCurrentWordStyle(styleData.backgroundColor as string).backgroundColor])
 
     return (
         <div
@@ -23,7 +28,7 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
         > 
             {segment?.words.map((wordData) => {
                 if (wordData.start <= videoCurrentTime && wordData.end >= videoCurrentTime) {
-                    return <span className="word active" style={getCurrentWordStyle(styleData.backgroundColor)}>{wordData.word}</span>
+                    return <span className="word active" style={{backgroundColor : color}}>{wordData.word}</span>
                 } else {
                     return <span className="word">{wordData.word}</span>
                 }
@@ -32,18 +37,15 @@ export function KineticWordCaption({transcript, segmentStyles}: CaptionProp) {
     )
 }
 
-function getCurrentWordStyle(segmentStyle: string | number) {
-    const backgroundColor = getContrastColor(segmentStyle)
+function getCurrentWordStyle(color: string) {
+    const backgroundColor = getContrastColor(color)
 
     return {
         backgroundColor: backgroundColor
     }
 }
 
-function getContrastColor(hexColor: string | number) {
-    if (typeof hexColor === "number") {
-        return "#000000"
-    }
+function getContrastColor(hexColor: string) {
     const hex = hexColor.replace("#", "");
 
     const r = parseInt(hex.slice(0, 2), 16);

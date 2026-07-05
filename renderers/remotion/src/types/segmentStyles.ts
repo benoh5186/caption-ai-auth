@@ -1,6 +1,7 @@
+import React from "react"
 
 export type SegmentStyles = {
     captionStyle: string,
-    globalStyle: Record<string, string | number>,
-    segmentStyles: Record<number, Record<string, string | number>>
+    globalStyle: React.CSSProperties,
+    segmentStyles: Record<number, React.CSSProperties>
 }

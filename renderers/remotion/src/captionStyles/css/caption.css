@@ -13,5 +13,4 @@
 .word {
     display: inline-block;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75);
-    transition: transform 120ms ease, background-color 120ms ease, color 120ms ease;
 }
