@@ -3,7 +3,7 @@ from redis.asyncio import Redis
 class TokenBucket():
     """
     token bucket rate limiting algorithm which has one public method: run() which calls call_next from fastapi middleware.
-    Else, it throws an Exception(custom exception to be implemented-==[p]=890u)
+    Else, it throws an Exception(custom exception to be implemented)
     """
     def __init__(self, redis_conn: Redis, key: str, refill_rate: int, max_tokens: int):
         self.__redis = redis_conn
@@ -58,6 +58,7 @@ class TokenBucket():
                 bucket['last_refill'] = now
                 return tokens
             end 
+            token_bucket()
         """, 1, self.__key, self.__max_tokens, self.__refill_rate) 
         return result 
 
