@@ -21,7 +21,6 @@ routers = [
     AuthRouter(database, auth_utility).router,
     SessionRouter(database, mongo_db, auth_utility).router,
     TranscribeRouter(mongo_db, auth_utility).router,
-
 ]
 
 class App:
