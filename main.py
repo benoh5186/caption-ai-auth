@@ -40,7 +40,7 @@ class App:
             allow_origins=self.origins,
             allow_credentials=True,
             allow_methods=["*"],
-            allow_headers=["*"]
+            allow_headers=["*"],
         )
 
     def __add_routers(self, routers):
