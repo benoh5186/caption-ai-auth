@@ -5,15 +5,16 @@ from services.rate_limiter import TokenBucket, LeakyBucket
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, redis_conn, dispatch = None):
+    def __init__(self, app, redis_conn, rules, dispatch = None):
         super().__init__(app, dispatch)
         self.__redis_conn = redis_conn
+        self.__rules = rules
 
     async def dispatch(self, request: Request, call_next):
        client_ip = self.__get_client_ip(request)
        if client_ip is None:
            raise HTTPException(status_code=400, detail="Could not identify the client")
-       rate_limit_resolver = RateLimiterResolver(self.__redis_conn, RATE_LIMIT_RULES, client_ip)
+       rate_limit_resolver = RateLimiterResolver(self.__redis_conn, self.__rules, client_ip)
        rate_limiter = rate_limit_resolver.get_rate_limiter(request.url.path)
        if rate_limiter is None:
            await call_next()
@@ -21,7 +22,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
            await call_next()
        raise HTTPException(status_code=429)
            
-           
+
     @staticmethod
     def __get_client_ip(request: Request):
         if request.client and request.client.host:

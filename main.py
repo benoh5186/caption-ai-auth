@@ -8,6 +8,9 @@ from routers.auth import AuthRouter, AuthUtility
 from routers.session import SessionRouter
 from routers.transcribe import TranscribeRouter
 from services.client_connector import ClientUtility
+from config.rate_limit_rules import RATE_LIMIT_RULES
+from middlewares.rate_limit import RateLimitMiddleware
+
 
 load_dotenv()
 
@@ -16,6 +19,8 @@ auth_utility = AuthUtility()
 
 mongo_client = ClientUtility.get_async_mongo_client()
 mongo_db = mongo_client["caption_ai"]
+
+async_redis_client = ClientUtility.get_async_redis_client()
 
 routers = [
     AuthRouter(database, auth_utility).router,
@@ -31,16 +36,21 @@ class App:
             "http://localhost:3000",
             "http://localhost:8000",
         ]
-        self.__add_middleware()
+        self.__add_middlewares()
         self.__add_routers(routers)
     
-    def __add_middleware(self):
+    def __add_middlewares(self):
         self.__app.add_middleware(
             CORSMiddleware,
             allow_origins=self.origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+        )
+        self.__app.add_middleware(
+            RateLimitMiddleware,
+            redis_conn=async_redis_client,
+            rules=RATE_LIMIT_RULES
         )
 
     def __add_routers(self, routers):
