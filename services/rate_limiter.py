@@ -11,11 +11,10 @@ class TokenBucket:
         self.__refill_rate = refill_rate 
         self.__max_tokens = max_tokens
 
-    async def run(self, call_next):
+    async def request_allowed(self):
         if await self.__check_bucket():
-            await call_next()
-        else:
-            raise Exception()
+            return True
+        return False 
 
     async def __check_bucket(self):
         result = await self.__redis.eval("""
@@ -70,11 +69,10 @@ class LeakyBucket:
         self.__leak_rate = leak_rate
         self.__max_bucket_size = max_bucket_size
 
-    async def run(self, call_next):
+    async def request_allowed(self):
         if await self.__check_bucket():
-            await call_next()
-        else:
-            raise Exception()
+            return True 
+        return False 
         
     async def __check_bucket(self):
         result = await self.__redis.eval("""
