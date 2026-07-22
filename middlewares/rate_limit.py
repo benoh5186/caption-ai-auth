@@ -17,8 +17,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
        rate_limiter = rate_limit_resolver.get_rate_limiter(request.url.path)
        if rate_limiter is None:
            await call_next()
-        # To implement after resolving rate limiter classes
-
+       if await rate_limiter.request_allowed():
+           await call_next()
+       raise HTTPException(status_code=429)
+           
+           
     @staticmethod
     def __get_client_ip(request: Request):
         if request.client and request.client.host:
