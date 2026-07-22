@@ -51,23 +51,23 @@ RATE_LIMIT_RULES = {
             "window_seconds": 60,
         },
         "/upload-video/{session_id}": {
-            "type": "token_bucket",
-            "max_tokens": 5,
-            "refill_rate": 5 / 30,
+            "type": "leaky_bucket",
+            "max_bucket_size": 5,
+            "leak_rate": 5 / 30,
             "window_seconds": 30,
         },
     },
     "/api/v1/transcribe": {
         "/transcribe/{session_id}": {
-            "type": "token_bucket",
-            "max_tokens": 5,
-            "refill_rate": 5 / 60,
+            "type": "leaky_bucket",
+            "max_bucket_size": 5,
+            "leak_rate": 5 / 60,
             "window_seconds": 60,
         },
         "/export/{session_id}": {
-            "type": "token_bucket",
-            "max_tokens": 10,
-            "refill_rate": 10 / 60,
+            "type": "leaky_bucket",
+            "max_bucket_size": 10,
+            "leak_rate": 10 / 60,
             "window_seconds": 60,
         },
         "/export-status/{job_id}/{session_id}": {

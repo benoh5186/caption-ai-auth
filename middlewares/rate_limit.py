@@ -1,6 +1,7 @@
 from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import Request 
+from fastapi import Request, HTTPException
 from config.rate_limit_rules import RATE_LIMIT_RULES
+from services.rate_limiter import TokenBucket, LeakyBucket
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -9,17 +10,57 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.__redis_conn = redis_conn
 
     async def dispatch(self, request: Request, call_next):
-       pass 
+       client_key = self.__get_client_ip(request)
+       if client_key is None:
+           raise HTTPException(status_code=400, detail="Could not identify the client")
+       rate_limit_resolver = RateLimiterResolver(self.__redis_conn, RATE_LIMIT_RULES, client_key)
+       rate_limiter = rate_limit_resolver.get_rate_limiter(request.url.path)
+       if rate_limiter is None:
+           await call_next()
+        # To implement after resolving rate limiter classes
+
+    @staticmethod
+    def __get_client_ip(request: Request):
+        if request.client and request.client.host:
+            return request.client.host
+        return None
           
 
 
 class RateLimiterResolver:
-    def __init__(self, redis_conn, rules):
+    __DEFAULT_RATE_LIMITER_ARG = {
+        "token_bucket" : {
+            "max_tokens" : 10,
+            "refill_rate" : 10 / 60
+        },
+        "leaky_bucket" : {
+            "max_bucket_size" : 5,
+            "leak_rate" : 5 / 30
+        }
+    }
+    def __init__(self, redis_conn, rules, key):
         self.__redis_conn = redis_conn
         self.__rules = rules 
+        self.__key = key 
 
     def get_rate_limiter(self, path: str):
-        pass
+        default_token_bucket = self.__DEFAULT_RATE_LIMITER_ARG["token_bucket"]
+        default_leaky_bucket = self.__DEFAULT_RATE_LIMITER_ARG["leaky_bucket"]
+        rule = self.__find_rate_limit_rule(path=path)
+        if rule is None:
+            return None 
+        type = rule.get("type")
+        if type == "token_bucket":
+            max_tokens = rule.get("max_tokens", default_token_bucket["max_tokens"])
+            refill_rate = rule.get("refill_rate", default_token_bucket["refill_rate"])
+            return TokenBucket(redis_conn=self.__redis_conn, key=self.__key, refill_rate=refill_rate, max_tokens=max_tokens)
+        if type == "leaky_bucket":
+            max_bucket_size = rule.get("max_bucket_size", default_leaky_bucket["max_bucket_size"])
+            leak_rate = rule.get("leak_rate", default_leaky_bucket["leak_rate"])
+            return LeakyBucket(redis_conn=self.__redis_conn, key=self.__key, leak_rate=leak_rate, max_bucket_size=max_bucket_size)
+        return TokenBucket(redis_conn=self.__redis_conn, key=self.__key, refill_rate=default_token_bucket["refill_Rate"], max_tokens=default_token_bucket["max_tokens"])
+            
+
     
     def __find_rate_limit_rule(self, path: str):
         for pref, endpoint_rules in self.__rules.items():
