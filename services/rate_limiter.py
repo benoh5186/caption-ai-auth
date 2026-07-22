@@ -1,6 +1,14 @@
 from redis.asyncio import Redis 
+from abc import ABC, abstractmethod
 
-class TokenBucket:
+class RateLimiter(ABC):
+
+    @abstractmethod
+    async def request_allowed():
+        pass 
+    
+
+class TokenBucket(RateLimiter):
     """
     token bucket rate limiting algorithm which has one public method: run() which calls call_next from fastapi middleware.
     Else, it throws an Exception(custom exception to be implemented)
@@ -62,7 +70,7 @@ class TokenBucket:
         """, 1, self.__key, self.__max_tokens, self.__refill_rate) 
         return result 
 
-class LeakyBucket:
+class LeakyBucket(RateLimiter):
     def __init__(self, redis_conn: Redis, key: str, leak_rate: int, max_bucket_size: int):
         self.__redis = redis_conn
         self.__key = key
