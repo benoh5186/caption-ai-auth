@@ -65,12 +65,6 @@ class SessionRouter:
         )
 
     async def load_sessions(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=10,
-            window_seconds=30,
-            route_name="/load-sessions",
-        )
         session_payload = self.__auth_utility.require_session(request)
         cursor = self.__user_session_metadata.find(
             {"user_id" : session_payload.get("sub")},
@@ -88,12 +82,6 @@ class SessionRouter:
 
 
     async def load_session(self, request: Request, session_id: str):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=10,
-            window_seconds=30,
-            route_name="/load-session",
-        )
         session_payload = self.__auth_utility.require_session(request)
         session =  await self.__user_session_metadata.find_one(
             {
@@ -107,12 +95,6 @@ class SessionRouter:
         return session
 
     async def upload_video(self, request: Request, session_id: str, video: UploadFile = File(...)):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=5,
-            window_seconds=30,
-            route_name="/load-session-video",
-        )
         session_payload = self.__auth_utility.require_session(request)
         content_type = video.headers.get("content-type", "")
         
@@ -176,12 +158,6 @@ class SessionRouter:
 
 
     async def load_session_video(self, request: Request, session_id: str):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=20,
-            window_seconds=60,
-            route_name="/load-session-video",
-        )
         payload = self.__auth_utility.require_session(request)
         session_doc = await self.__user_session_metadata.find_one(
             {"user_id" : payload.get("sub"), "session_id" : session_id},
@@ -211,12 +187,6 @@ class SessionRouter:
         )       
 
     async def create_session(self, request: Request):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=1,
-            window_seconds=5,
-            route_name="/create-session",
-        )
         session_payload = self.__auth_utility.require_session(request)
         session_id = str(uuid.uuid4())
         try:
@@ -238,12 +208,6 @@ class SessionRouter:
 
     
     async def delete_session(self, request: Request, session_id: str):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=2,
-            window_seconds=5,
-            route_name="/delete-session",
-        )
         session_payload = self.__auth_utility.require_session(request)
         user_session = await self.__user_session_metadata.find_one(
             {"user_id" : session_payload.get("sub"), "session_id" : session_id},
@@ -271,12 +235,6 @@ class SessionRouter:
 
 
     async def save_session(self, request: Request, session_id: str):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=10,
-            window_seconds=60,
-            route_name="/save-session",
-        )
         session_payload = self.__auth_utility.require_session(request)
         try:
             session_info = await request.json()

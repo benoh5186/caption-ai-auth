@@ -59,47 +59,6 @@ class AuthUtility:
         except jwt.PyJWTError as exc:
             raise HTTPException(status_code=401, detail="Invalid session token.") from exc
         
-    def __allow_request(self, key: str, max_requests: int, window_seconds: int) -> tuple[bool, int]:
-        now = time.time()
-        window_start = now - window_seconds
-        times = self._requests[key]
-        while times and times[0] <= window_start:
-            times.popleft()
-        if len(times) >= max_requests:
-            wait_time = max(1, int(times[0] + window_seconds - now))
-            return False, wait_time
-        times.append(now)
-        return True, 0
-    
-
-    def enforce_rate_limit(
-            self,  
-            request: Request,
-            max_requests: int, 
-            window_seconds: int, 
-            route_name: str):
-        client = self.__client_identifier(request)
-        key = f"{route_name}: {client}"
-        allowed, wait_time = self.__allow_request(key=key, max_requests=max_requests, window_seconds=window_seconds)
-        if not allowed:
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    f"Rate limit exceeded for {route_name}. "
-                    f"Try again in about {wait_time} seconds."
-                ),
-            )
-
-    @staticmethod
-    def __client_identifier(request: Request) -> str:
-        forwarded_for = request.headers.get("x-forwarded-for")
-        if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
-        if request.client and request.client.host:
-            return request.client.host
-        return "unknown"
-
-
 
 
 class AuthRouter:
@@ -115,12 +74,6 @@ class AuthRouter:
         self.__router.add_api_route("/authenticate", self.authenticate, methods=["GET"])
 
     async def signup(self, signup: UserLogin, request: Request):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=2,
-            window_seconds=60,
-            route_name="/signup",
-        )
         user_create = UserCreate(
             email=signup.email,
             password_hash=self.__hash_password(signup.password),
@@ -148,12 +101,6 @@ class AuthRouter:
 
 
     async def login(self, login: UserLogin, request: Request):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=6,
-            window_seconds=60,
-            route_name="/login",
-        )
         user = self.__user.get_user_by_email(login.email)
         if not user or not user.password_hash:
             raise HTTPException(status_code=401, detail="Invalid email or password.")

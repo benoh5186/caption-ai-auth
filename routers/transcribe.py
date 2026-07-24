@@ -59,12 +59,6 @@ class TranscribeRouter:
         )
 
     async def export(self, request: Request, session_id):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=10,
-            window_seconds=60,
-            route_name="/export",
-        )
         session_payload = self.__auth_utility.require_session(request)
         job_id = str(uuid.uuid4())
         user_id = session_payload.get("sub")
@@ -102,12 +96,6 @@ class TranscribeRouter:
         return {"job_id" : job_id}
 
     async def export_status(self, request: Request, job_id: str, session_id: str):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=10,
-            window_seconds=60,
-            route_name="/export-status",
-        )
         session_payload = self.__auth_utility.require_session(request)
         job = await self.__job_info_metadata.find_one(
             {"job_id" : job_id,
@@ -134,12 +122,6 @@ class TranscribeRouter:
             }
         
     async def download(self, request: Request, job_id):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=10,
-            window_seconds=60,
-            route_name="/download",
-        )
         session_payload = self.__auth_utility.require_session(request)
         export_job = await self.__job_info_metadata.find_one(
             {"job_id" : job_id,
@@ -167,12 +149,6 @@ class TranscribeRouter:
 
 
     async def transcribe(self, request: Request, session_id):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=5,
-            window_seconds=60,
-            route_name="/transcribe",
-        )
         session_payload = self.__auth_utility.require_session(request)
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
@@ -234,12 +210,6 @@ class TranscribeRouter:
             ) from exc
         
     async def transcript(self, request: Request, session_id):
-        self.__auth_utility.enforce_rate_limit(
-            request=request,
-            max_requests=2,
-            window_seconds=60,
-            route_name="/transcript",
-        )
         session_payload = self.__auth_utility.require_session(request)
         session_doc = await self.__user_session_metadata.find_one(
             {"user_id" : session_payload.get("sub"), 
