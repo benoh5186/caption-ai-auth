@@ -101,6 +101,7 @@ class AuthRouter:
 
 
     async def login(self, login: UserLogin, request: Request):
+        print("inside login endpoint")
         user = self.__user.get_user_by_email(login.email)
         if not user or not user.password_hash:
             raise HTTPException(status_code=401, detail="Invalid email or password.")

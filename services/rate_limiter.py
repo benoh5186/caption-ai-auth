@@ -1,5 +1,6 @@
 from redis.asyncio import Redis 
 from abc import ABC, abstractmethod
+import time 
 
 class RateLimiter(ABC):
 
@@ -30,11 +31,20 @@ class TokenBucket(RateLimiter):
             local max_tokens = tonumber(ARGV[1])
             local refill_rate = tonumber(ARGV[2])
             local now = tonumber(ARGV[3])
+                                         
+
+            local function refill(bucket)
+                local elapsed = now - tonumber(bucket['last_refill'])
+                local tokens = tonumber(bucket['tokens']) + (elapsed * refill_rate)
+                bucket['tokens'] = math.min(max_tokens, tokens)
+                bucket['last_refill'] = now
+                return tokens
+            end 
             
-            function token_bucket()
+            local function token_bucket()
                 local data = redis.call('HGETALL', key)
                 local fields = {}
-                local allowed = 0
+                local allowed = 1
                 if (#data > 0) 
                 then 
                     for i = 1, #data, 2
@@ -44,9 +54,9 @@ class TokenBucket(RateLimiter):
                     refill(fields)
                     if (fields['tokens'] <= 0)
                     then 
-                        allowed = 1
+                        allowed = 0
                     else
-                        fields['tokens'] = fields['tokens'] - 1
+                        fields['tokens'] = tonumber(fields['tokens']) - 1
                     end 
                 else
                     fields['tokens'] = max_tokens - 1 
@@ -59,15 +69,8 @@ class TokenBucket(RateLimiter):
                 
             end 
             
-            function refill(bucket)
-                elapsed = now - bucket['last_refill']
-                local tokens = bucket[tokens] + (elapsed * refill_rate)
-                bucket['tokens'] = math.min(max_tokens, tokens)
-                bucket['last_refill'] = now
-                return tokens
-            end 
-            token_bucket()
-        """, 1, self.__key, self.__max_tokens, self.__refill_rate) 
+            return token_bucket()
+        """, 1, self.__key, self.__max_tokens, self.__refill_rate, time.time()) 
         return result 
 
 class LeakyBucket(RateLimiter):
@@ -88,8 +91,16 @@ class LeakyBucket(RateLimiter):
                     local leak_rate = tonumber(ARGV[1])
                     local max_bucket_size = tonumber(ARGV[2])
                     local now = tonumber(ARGV[3])
+                                         
+
+                    local function refill(bucket)
+                        local elapsed = now - bucket['last_leak']
+                        local new_bucket = tonumber(bucket['bucket_size']) - (elapsed * leak_rate)
+                        bucket['bucket_size'] = math.max(0, new_bucket)
+                        bucket['last_refill'] = now 
+                    end
                                    
-                    function leaky_bucket()
+                    local function leaky_bucket()
                         local data = redis.call("HGETALL", key)
                         local fields = {}
                         local allowed = 0
@@ -116,11 +127,7 @@ class LeakyBucket(RateLimiter):
                         return allowed
                     end
                                          
-                    function refill(bucket)
-                        local elapsed = now - bucket['last_leak']
-                        local new_bucket = bucket['bucket_size'] - (elapsed * leak_rate)
-                        bucket['bucket_size'] = math.max(0, new_bucket)
-                        bucket['last_refill'] = now 
-                    end
-                """, 1, self.__key, self.__leak_rate, self.__max_bucket_size)
+                                         
+                    return leaky_bucket()
+                """, 1, self.__key, self.__leak_rate, self.__max_bucket_size, time.time())
         return result 

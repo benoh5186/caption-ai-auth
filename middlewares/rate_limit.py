@@ -1,31 +1,41 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
 from config.rate_limit_rules import RATE_LIMIT_RULES
 from services.rate_limiter import TokenBucket, LeakyBucket
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, redis_conn, rules, dispatch = None):
-        super().__init__(app, dispatch)
+    def __init__(self, app, redis_conn, rules):
+        super().__init__(app)
         self.__redis_conn = redis_conn
         self.__rules = rules
 
     async def dispatch(self, request: Request, call_next):
+       if request.method == "OPTIONS":
+           return await call_next(request)
        client_ip = self.__get_client_ip(request)
+       print(client_ip)
        if client_ip is None:
-           raise HTTPException(status_code=400, detail="Could not identify the client")
+           print("here")
+           raise JSONResponse(status_code=400, content={"detail": "Could not identify the client"})
        rate_limit_resolver = RateLimiterResolver(self.__redis_conn, self.__rules, client_ip)
        rate_limiter = rate_limit_resolver.get_rate_limiter(request.url.path)
        if rate_limiter is None:
-           await call_next()
+           return await call_next(request)
        if await rate_limiter.request_allowed():
-           await call_next()
-       raise HTTPException(status_code=429)
+           print("def here")
+           response = await call_next(request)
+           print("downstream status:", response.status_code)
+           return response
+
+       return  JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
            
 
     @staticmethod
     def __get_client_ip(request: Request):
         if request.client and request.client.host:
+            print(request.client.host)
             return request.client.host
         return None
           

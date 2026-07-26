@@ -28,4 +28,4 @@ class ClientUtility():
         )
     @staticmethod
     def get_async_redis_client():
-        return Redis(os.getenv("REDIS_URL"))
+        return Redis.from_url(os.getenv("REDIS_URL"))

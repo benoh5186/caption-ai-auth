@@ -35,6 +35,7 @@ class App:
         self.origins = [
             "http://localhost:3000",
             "http://localhost:8000",
+            "http://localhost:5173"
         ]
         self.__add_middlewares()
         self.__add_routers(routers)
