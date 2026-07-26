@@ -103,7 +103,7 @@ class LeakyBucket(RateLimiter):
                     local function leaky_bucket()
                         local data = redis.call("HGETALL", key)
                         local fields = {}
-                        local allowed = 0
+                        local allowed = 1
                         if (#data > 0)    
                         then   
                             for i = 1, #data, 2
@@ -113,7 +113,7 @@ class LeakyBucket(RateLimiter):
                             refill(fields)
                             if (fields['bucket_size'] == max_bucket_size)
                             then 
-                                allowed = 1
+                                allowed = 0
                             else
                                 fields['bucket_size'] = fields['bucket_size'] - 1 
                             end 
