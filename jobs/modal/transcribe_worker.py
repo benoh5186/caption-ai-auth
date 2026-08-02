@@ -53,8 +53,35 @@ class TranscriptMaker:
             check=True
         )
         
-
-
     def __transcribe(self, audio_file):
-        segments, info = self.model.transcribe(audio_file, beam_size=1)
+        segments, _ = self.model.transcribe(audio_file, beam_size=1)
+        transcript_json = self.__parse_whisper_response_json(segments)
+        return transcript_json
+    
+    def __parse_whisper_response_json(self, segments):
+        transcript_json = {"segments" : [], "words" : []}
+        for segment in segments:
+            transcript_json["segments"].append(
+                {
+                    "id" : segment.id,
+                    "start" : segment.start,
+                    "end" : segment.end,
+                    "text" : segment.text,
+                    "words" : [
+                       { "start" : word.start,
+                         "end" : word.end,
+                         "word" : word.word
+                        } for word in (segment.words or [])
+                    ]
+                }
+            )
+            for word in (segment.words or []):
+                transcript_json["words"].append(
+                    {
+                        "start" : word.start,
+                         "end" : word.end,
+                         "word" : word.word
+                    }
+                )
+        return transcript_json
          
