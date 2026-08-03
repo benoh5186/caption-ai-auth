@@ -1,11 +1,14 @@
 import modal 
-from dotenv import load_dotenv
 import os 
 import tempfile
 import boto3
 import subprocess 
 
-load_dotenv()
+image = (
+    modal.Image.debian_slim()
+    .apt_install("ffmpeg")
+    .pip_install("faster-whisper", "boto3")
+)
 
 app = modal.App()
 
@@ -15,7 +18,7 @@ class TranscriptMaker:
     @modal.enter()
     def startup(self): 
         from faster_whisper import WhisperModel # type: ignore
-        self.model = WhisperModel("distil-large-v3", device="cuba")
+        self.model = WhisperModel("distil-large-v3", device="cuba", compute_type="float16")
 
     @modal.method
     def get_transcript(self, bucket, video_id):
