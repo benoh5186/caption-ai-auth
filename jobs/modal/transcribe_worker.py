@@ -12,7 +12,7 @@ image = (
 
 app = modal.App()
 
-@app.cls(cpu=8, secrets=[modal.Secret.from_name("transcript-maker")])
+@app.cls(cpu=8, secrets=[modal.Secret.from_name("transcript-maker")], image=image)
 class TranscriptMaker:
 
     @modal.enter()
