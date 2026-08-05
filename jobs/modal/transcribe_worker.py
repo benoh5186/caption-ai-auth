@@ -3,6 +3,9 @@ import os
 import tempfile
 import boto3
 import subprocess 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 image = (
     modal.Image.debian_slim()
