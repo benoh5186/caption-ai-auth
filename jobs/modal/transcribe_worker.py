@@ -24,8 +24,8 @@ class TranscriptMaker:
         self.model = WhisperModel("distil-large-v3", device="cuba", compute_type="float16")
 
     @modal.method
-    def get_transcript(self, bucket, video_id):
-        s3_bucket_info = {"bucket" : bucket, "obj_name" : video_id}
+    def get_transcript(self, bucket, s3_key):
+        s3_bucket_info = {"bucket" : bucket, "s3_key" : s3_key}
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as temp_vid:
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_audio:
                 try:
@@ -45,7 +45,7 @@ class TranscriptMaker:
             aws_secret_access_key=os.environ("AWS_S3_SECRET_KEY"),
             region_name=os.environ("AWS_REGION"),
         ) 
-        s3_client.download_file(s3_bucket_info.get("bucket"), s3_bucket_info.get("obj_name"), vid_file)
+        s3_client.download_file(s3_bucket_info.get("bucket"), s3_bucket_info.get("s3_key"), vid_file)
         subprocess.run(
             [
                 "ffmpeg",
