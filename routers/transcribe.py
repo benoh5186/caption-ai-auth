@@ -14,7 +14,7 @@ import json
 from services.subtitle_styler import SubtitleStyler
 from services.subtitle_embedder import SubtitleEmbedder
 import tempfile 
-from jobs.queue import enqueue_render_job
+from jobs.queue import enqueue_render_job, enqueue_transcribe_job
 from redis import RedisError 
 import datetime
 from services.client_connector import ClientUtility
@@ -94,6 +94,45 @@ class TranscribeRouter:
             })
             raise HTTPException(status_code=500, detail="failed to enqueue render job.")
         return {"job_id" : job_id}
+    
+    async def transcribe_v2(self, request: Request, session_id):
+        session_payload = self.__auth_utility.require_session(request)
+        job_id = str(uuid.uuid4())
+        user_id = session_payload.get("sub")
+        await self.__job_info_metadata.insert_one({
+            "job_id" : job_id,
+            "user_id" : user_id,
+            "created_at" : datetime.datetime.utcnow(),
+            "completed" : None,
+            "error" : None 
+        })
+        await self.__user_session_metadata.update_one(
+            {"user_id" : user_id, "session_id" : session_id},
+            { "$set" : {"job_id" : job_id}}
+        )
+        try:
+            enqueue_transcribe_job(
+                job_id=job_id,
+                session_id=session_id,
+                user_id=user_id,
+                bucket_name=self.__bucket_name
+            )
+        except RedisError:
+            await self.__job_info_metadata.delete_one({
+                "job_id": job_id,
+                "user_id": user_id,
+            })
+            raise HTTPException(status_code=503, detail="redis queue is unavailable")
+
+        except Exception:
+            await self.__job_info_metadata.delete_one({
+                "job_id": job_id,
+                "user_id": user_id,
+            })
+            raise HTTPException(status_code=500, detail="failed to enqueue render job.")
+        return {"job_id" : job_id}
+
+        
 
     async def export_status(self, request: Request, job_id: str, session_id: str):
         session_payload = self.__auth_utility.require_session(request)

@@ -3,6 +3,7 @@ from rq import Queue
 from redis import Redis
 from jobs.tasks.render import render_video_job, render_vid_job
 from jobs.tasks.cleanup import clean_up_expired_jobs
+from jobs.tasks.transcribe import transcribe_job
 from jobs.redis_conn import redis_conn
 
 
@@ -17,6 +18,17 @@ def enqueue_render_job(job_id: str, session_id: str, user_id: str, bucket_name: 
             "user_id" : user_id,
             "bucket_name" : bucket_name,
             "burned_video_bucket" : burned_video_bucket
+        }
+    )
+
+def enqueue_transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str):
+    redis_queue.enqueue(
+        transcribe_job,
+        kwargs={
+            "job_id" : job_id,
+            "session_id" : session_id,
+            "user_id" : user_id,
+            "bucket_name" : bucket_name
         }
     )
 
