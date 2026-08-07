@@ -2,6 +2,7 @@ from services.client_connector import ClientUtility
 from jobs.modal.transcribe_worker import TranscriptMaker
 import datetime
 from pymongo import MongoClient
+import modal 
 
 def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str):
     mongo_db = None 
@@ -19,8 +20,9 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
             __set_job_failed("session does not exist for this job", mongo_jobs_coll, job_id, user_id)
             return 
         s3_key = user_session.get("s3_key")
-        transcript = TranscriptMaker().get_transcript(bucket_name, s3_key)
-        if type(transcript) is str:
+        model = modal.Cls.from_name("transcriber", "TranscriptMaker")
+        transcript = model().get_transcript.remote(bucket=bucket_name, s3_key=s3_key)
+        if isinstance(transcript, str):
             __set_job_failed("failed to transcribe", mongo_jobs_coll, job_id, user_id) 
         mongo_session_coll.update_one({
             "user_id" : user_id,

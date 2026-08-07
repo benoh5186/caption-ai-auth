@@ -3,9 +3,6 @@ import os
 import tempfile
 import boto3
 import subprocess 
-from dotenv import load_dotenv
-
-load_dotenv()
 
 image = (
     modal.Image.debian_slim()
@@ -13,17 +10,17 @@ image = (
     .pip_install("faster-whisper", "boto3")
 )
 
-app = modal.App()
+app = modal.App("transcriber")
 
-@app.cls(cpu=8, secrets=[modal.Secret.from_name("transcript-maker")], image=image)
+@app.cls(gpu="L4", secrets=[modal.Secret.from_name("transcript-maker")], image=image)
 class TranscriptMaker:
 
     @modal.enter()
     def startup(self): 
         from faster_whisper import WhisperModel # type: ignore
-        self.model = WhisperModel("distil-large-v3", device="cuba", compute_type="float16")
+        self.model = WhisperModel("distil-large-v3", device="cuda", compute_type="float16")
 
-    @modal.method
+    @modal.method()
     def get_transcript(self, bucket, s3_key):
         s3_bucket_info = {"bucket" : bucket, "s3_key" : s3_key}
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as temp_vid:

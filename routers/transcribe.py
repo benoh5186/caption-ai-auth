@@ -57,6 +57,11 @@ class TranscribeRouter:
             self.transcript,
             methods=["POST"]
         )
+        self.__router.add_api_route(
+            "/transcribe_v2/{session_id}",
+            self.transcribe_v2,
+            methods=["POST"]
+        )
 
     async def export(self, request: Request, session_id):
         session_payload = self.__auth_utility.require_session(request)
