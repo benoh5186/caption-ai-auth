@@ -73,7 +73,7 @@ class TranscriptMaker:
            raise RuntimeError(f"ffmpeg failed: {exc.stderr}") from exc
         
     def __transcribe(self, audio_file):
-        segments, _ = self.model.transcribe(audio_file, beam_size=1)
+        segments, _ = self.model.transcribe(audio_file, beam_size=1, word_timestamps=True)
         transcript_json = self.__parse_whisper_response_json(segments)
         return transcript_json
     
