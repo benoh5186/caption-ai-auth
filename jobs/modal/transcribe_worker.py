@@ -3,9 +3,17 @@ import os
 import tempfile
 import boto3
 import subprocess 
+from subprocess import CalledProcessError
+
+cuda_version = "12.8.1"
+flavor = "devel"
+operating_sys = "ubuntu24.04"
+tag = f"{cuda_version}-{flavor}-{operating_sys}"
 
 image = (
-    modal.Image.debian_slim()
+    modal.Image.from_registry(
+        f"nvidia/cuda:{tag}", add_python="3.11"
+    )
     .apt_install("ffmpeg")
     .pip_install("faster-whisper", "boto3")
 )
@@ -38,24 +46,31 @@ class TranscriptMaker:
     def __convert_to_audio(self, s3_bucket_info, vid_file, audio_file):
         s3_client = boto3.client(
             "s3",
-            aws_access_key_id=os.environ("AWS_S3_ACCESS_KEY"),
-            aws_secret_access_key=os.environ("AWS_S3_SECRET_KEY"),
-            region_name=os.environ("AWS_REGION"),
+            aws_access_key_id=os.environ["AWS_S3_ACCESS_KEY"],
+            aws_secret_access_key=os.environ["AWS_S3_SECRET_KEY"],
+            region_name=os.environ["AWS_REGION"],
         ) 
         s3_client.download_file(s3_bucket_info.get("bucket"), s3_bucket_info.get("s3_key"), vid_file)
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-i", vid_file,
-                "-vn",
-                "-ac", "1",
-                "-ar", "16000",
-                "-c:a", "libmp3lame",
-                "-b:a", "32k",
-                audio_file,
-            ],
-            check=True
-        )
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i", vid_file,
+                    "-vn",
+                    "-ac", "1",
+                    "-ar", "16000",
+                    "-c:a", "libmp3lame",
+                    "-b:a", "32k",
+                    audio_file,
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True
+                )
+        except CalledProcessError as exc:
+           raise RuntimeError(f"ffmpeg failed: {exc.stderr}") from exc
         
     def __transcribe(self, audio_file):
         segments, _ = self.model.transcribe(audio_file, beam_size=1)
