@@ -18,10 +18,11 @@ from jobs.queue import enqueue_render_job, enqueue_transcribe_job
 from redis import RedisError 
 import datetime
 from services.client_connector import ClientUtility
+from db.db import Database
 
 
 class TranscribeRouter:
-    def __init__(self, mongo_db: AsyncIOMotorClient, auth_utility: AuthUtility) -> None:
+    def __init__(self, mongo_db: AsyncIOMotorClient, user_db: Database, auth_utility: AuthUtility) -> None:
         self.__router = APIRouter(prefix="/api/v1/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
         self.__burned_bucket_name = os.getenv("S3_BURNED_VIDEO")
@@ -29,6 +30,7 @@ class TranscribeRouter:
         self.__register_routes()
         self.__user_session_metadata = mongo_db["user_session_metadata"]
         self.__job_info_metadata = mongo_db["background_jobs_collection"]
+        self.__user_db = user_db
         self.__auth_utility = auth_utility
 
     def __register_routes(self) -> None:
@@ -104,6 +106,10 @@ class TranscribeRouter:
         session_payload = self.__auth_utility.require_session(request)
         job_id = str(uuid.uuid4())
         user_id = session_payload.get("sub")
+        user = self.__user_db.get_user_by_id(user_id)
+        user_daily_transcribe_limit = user.get("transcribe_min")
+        
+
         await self.__job_info_metadata.insert_one({
             "job_id" : job_id,
             "user_id" : user_id,

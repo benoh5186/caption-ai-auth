@@ -4,6 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from redis.asyncio import Redis  
+from db.db import Database
 
 
 load_dotenv()
@@ -29,3 +30,9 @@ class ClientUtility():
     @staticmethod
     def get_async_redis_client():
         return Redis.from_url(os.getenv("REDIS_URL"))
+
+    @staticmethod
+    def get_database():
+        database = Database()
+        database.start_database()
+        return database 

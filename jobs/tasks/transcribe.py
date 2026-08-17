@@ -8,6 +8,9 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
     mongo_db = None 
     mongo_jobs_coll = None 
     try:
+        user_db = ClientUtility.get_database()
+        user = user_db.get_user_by_id(user_id)
+        transcribable_min = user.get("transcribable_time")
         mongo_client: MongoClient = ClientUtility.get_mongo_client()
         mongo_db = mongo_client["caption_ai"]
         mongo_session_coll = mongo_db["user_session_metadata"]
@@ -20,6 +23,10 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
             __set_job_failed("session does not exist for this job", mongo_jobs_coll, job_id, user_id)
             return 
         s3_key = user_session.get("s3_key")
+        vid_min = user_session.get("vid_min")
+        if vid_min > transcribable_min:
+            __set_job_failed("video time exceeds total transcribeable minutes user has left", mongo_jobs_coll, job_id, user_id)
+            return 
         model = modal.Cls.from_name("transcriber", "TranscriptMaker")
         transcript = model().get_transcript.remote(bucket=bucket_name, s3_key=s3_key)
         if isinstance(transcript, str):
@@ -32,6 +39,8 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                 "transcript" : transcript
             }
         })
+        updated_transcribable_time = transcribable_min - vid_min
+        user_db.update_user_profile(user_id=user_id, metadata={"transcribable_time" : updated_transcribable_time})
         mongo_jobs_coll.update_one({
             "user_id" : user_id,
             "session_id" : session_id 

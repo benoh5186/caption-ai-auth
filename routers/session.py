@@ -94,6 +94,7 @@ class SessionRouter:
             return HTTPException(status_code=404, detail="no such session")
         return session
 
+    # return presigned url instead and will need to make another endpoint that confirms that the video has successfully been uploaded to the bucket and then calculate video time for user metadata
     async def upload_video(self, request: Request, session_id: str, video: UploadFile = File(...)):
         session_payload = self.__auth_utility.require_session(request)
         content_type = video.headers.get("content-type", "")
