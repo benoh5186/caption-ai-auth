@@ -106,9 +106,6 @@ class TranscribeRouter:
         session_payload = self.__auth_utility.require_session(request)
         job_id = str(uuid.uuid4())
         user_id = session_payload.get("sub")
-        user = self.__user_db.get_user_by_id(user_id)
-        user_daily_transcribe_limit = user.get("transcribe_min")
-        
 
         await self.__job_info_metadata.insert_one({
             "job_id" : job_id,

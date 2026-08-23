@@ -10,9 +10,9 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
     mongo_jobs_coll = None 
     try:
         user_db = ClientUtility.get_database()
-        user = __get_user_metadata(user_db, user_id)
+        transcribe_info = __get_user_metadata(user_db, user_id)
 
-        transcribable_min = user.get("transcribable_time")
+        transcribable_time = transcribe_info.get("transcribable_time")
         mongo_client: MongoClient = ClientUtility.get_mongo_client()
         mongo_db = mongo_client["caption_ai"]
         mongo_session_coll = mongo_db["user_session_metadata"]
@@ -25,10 +25,10 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
             __set_job_failed("session does not exist for this job", mongo_jobs_coll, job_id, user_id)
             return 
         s3_key = user_session.get("s3_key")
-        vid_min = user_session.get("vid_min")
+        vid_time = user_session.get("vid_time")
 
 
-        if vid_min > transcribable_min:
+        if vid_time > transcribable_time:
             __set_job_failed("video time exceeds total transcribeable minutes user has left", mongo_jobs_coll, job_id, user_id)
             return 
         model = modal.Cls.from_name("transcriber", "TranscriptMaker")
@@ -43,8 +43,11 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                 "transcript" : transcript
             }
         })
-        updated_transcribable_time = transcribable_min - vid_min
-        user_db.update_user_profile(user_id=user_id, metadata={"transcribable_time" : updated_transcribable_time})
+        updated_transcribable_time = transcribable_time - vid_time
+        user_db.update_user_profile(user_id=user_id, metadata={"transcribe_info" : {
+                        "transcribable_time" : updated_transcribable_time,
+                        "last_updated" : transcribe_info.get("last_updated")
+                    }})
         mongo_jobs_coll.update_one({
             "user_id" : user_id,
             "session_id" : session_id 
@@ -71,14 +74,14 @@ def __get_user_metadata(user_db, user_id):
     now = datetime.now(tz=timezone.utc)
     elapsed = now - transcribe_info.get("last_updated")
     if elapsed >= timedelta(days=1):
-        user_db.update_user_profile(user_id=user_id, metadata={
-            "transcribe_info" : {
-                "transcribable_time" : refill_time,
-                "last_updated" : now
-            }
-        }) 
-        return refill_time
-    return transcribe_info.get("transcribable_time")
+        updated_metadata = {
+             "transcribe_info" : {
+                        "transcribable_time" : refill_time,
+                        "last_updated" : now }
+        }
+        user_db.update_user_profile(user_id=user_id, metadata=updated_metadata) 
+        return updated_metadata.get("transcribe_info")
+    return transcribe_info
 
 
 def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
