@@ -9,6 +9,7 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
     mongo_db = None 
     mongo_jobs_coll = None
     try:
+        user_db = ClientUtility.get_database()
         mongo_client: MongoClient = ClientUtility.get_mongo_client()
         mongo_db = mongo_client["caption_ai"]
         mongo_session_coll = mongo_db["user_session_metadata"]

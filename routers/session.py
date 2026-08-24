@@ -10,6 +10,8 @@ from urllib.parse import quote
 import uuid
 import subprocess
 import tempfile
+from jobs.queue import enqueue_vid_time_job
+from redis import RedisError 
 
 
 class SessionRouter:
@@ -143,8 +145,57 @@ class SessionRouter:
         }  
 
     async def save_video_metadata(self, request: Request, session_id: str):
-        return 
+        session_payload = self.__auth_utility.require_session(request)
+        user_id = session_payload.get("user_id")
+        job_id = str(uuid.uuid4())
+        try:
+            enqueue_vid_time_job(
+                        job_id=job_id,
+                        session_id=session_id,
+                        user_id=user_id,
+                        bucket_name=self.__bucket_name
+                    )
+        except RedisError:
+            await self.__job_info_metadata.delete_one({
+                "job_id": job_id,
+                "user_id": user_id,
+            })
+            raise HTTPException(status_code=503, detail="redis queue is unavailable")
 
+        except Exception:
+            await self.__job_info_metadata.delete_one({
+                "job_id": job_id,
+                "user_id": user_id,
+            })
+            raise HTTPException(status_code=500, detail="failed to enqueue render job.")
+        return {"job_id" : job_id}
+
+    async def job_status(self, request: Request, session_id: str, job_id: str):
+        session_payload = self.__auth_utility.require_session(request)
+        job = await self.__job_info_metadata.find_one(
+            {"job_id" : job_id,
+             "user_id" : session_payload.get("sub")
+             }
+        )
+        if job is None:
+            print("not found")
+            await self.__user_session_metadata.update_one(
+                {"user_id" : session_payload.get("sub"), "session_id" : session_id},
+                {"$set", {"job_id" : None}}
+            )
+            raise HTTPException(status_code=404)
+        status = job["completed"]
+        if status is not None:
+            return  {
+                "completed" : status,
+                "error" : job.get("error", None) 
+            }
+        else:
+            return {
+                "completed" : None,
+                "error" : None 
+            }
+    
     # return presigned url instead and will need to make another endpoint that confirms that the video has successfully been uploaded to the bucket and then calculate video time for user metadata
     async def upload_video(self, request: Request, session_id: str, video: UploadFile = File(...)):
         session_payload = self.__auth_utility.require_session(request)

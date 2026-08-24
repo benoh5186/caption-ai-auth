@@ -141,33 +141,6 @@ class TranscribeRouter:
         return {"job_id" : job_id}
 
         
-
-    async def export_status(self, request: Request, job_id: str, session_id: str):
-        session_payload = self.__auth_utility.require_session(request)
-        job = await self.__job_info_metadata.find_one(
-            {"job_id" : job_id,
-             "user_id" : session_payload.get("sub")
-             }
-        )
-        if job is None:
-            print("not found")
-            await self.__user_session_metadata.update_one(
-                {"user_id" : session_payload.get("sub"), "session_id" : session_id},
-                {"$set", {"job_id" : None}}
-            )
-            raise HTTPException(status_code=404)
-        status = job["completed"]
-        if status is not None:
-            return  {
-                "completed" : status,
-                "error" : job.get("error", None) 
-            }
-        else:
-            return {
-                "completed" : None,
-                "error" : None 
-            }
-        
     async def download(self, request: Request, job_id):
         session_payload = self.__auth_utility.require_session(request)
         export_job = await self.__job_info_metadata.find_one(
