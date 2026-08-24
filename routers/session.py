@@ -94,6 +94,54 @@ class SessionRouter:
             return HTTPException(status_code=404, detail="no such session")
         return session
 
+    async def upload_video_v2(self, request: Request, session_id: str):
+        session_payload = self.__auth_utility.require_session(request)
+        body = await request.json()
+        content_type = body.get("content_type")
+        if not content_type or content_type.startswith("video/"):
+            raise HTTPException(status_code=415, detail="expected video/* content type.")
+        if not self.__bucket_name:
+            raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
+        video_id = str(uuid.uuid4())
+        extension = self.__extension_from_content_type(content_type)
+        s3_key = f"videos/{video_id}.{extension}"
+        session_doc = await self.__user_session_metadata.find_one(
+                 {"user_id": session_payload.get("sub"), "session_id": session_id}
+                 )
+        if not session_doc:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        try:
+            upload_url = self.__s3_client.generate_presigned_url(
+                ClientMethod="put_object",
+                Params={
+                    "Bucket" : self.__bucket_name,
+                    "Key" : s3_key,
+                    "ContentType" : content_type
+                },
+                ExpiresIn=900
+            )
+
+                    
+        except (BotoCoreError, ClientError) as exc:
+            raise HTTPException(status_code=502, detail=f"S3 upload failed: {exc}") from exc
+        await self.__user_session_metadata.update_one(
+            {"user_id" : session_payload["sub"],
+             "session_id" : session_id
+             },
+            {"$set": {
+                "video_id": video_id,
+                "s3_key": s3_key,
+                "upload_status" : "pending upload"
+                }}
+            )
+        
+        return {
+            "upload_url" : upload_url,
+            "video_id" : video_id,
+            "s3_key" : s3_key,
+            "expires_in" : 900
+        }  
+
     # return presigned url instead and will need to make another endpoint that confirms that the video has successfully been uploaded to the bucket and then calculate video time for user metadata
     async def upload_video(self, request: Request, session_id: str, video: UploadFile = File(...)):
         session_payload = self.__auth_utility.require_session(request)
