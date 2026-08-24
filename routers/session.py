@@ -142,6 +142,9 @@ class SessionRouter:
             "expires_in" : 900
         }  
 
+    async def save_video_metadata(self, request: Request, session_id: str):
+        return 
+
     # return presigned url instead and will need to make another endpoint that confirms that the video has successfully been uploaded to the bucket and then calculate video time for user metadata
     async def upload_video(self, request: Request, session_id: str, video: UploadFile = File(...)):
         session_payload = self.__auth_utility.require_session(request)
