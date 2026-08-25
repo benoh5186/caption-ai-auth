@@ -86,7 +86,13 @@ class Database:
 
     def create_user(self, user: UserCreate) -> UserSchema:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        metadata = self.__to_json(user.metadata)
+        metadata = {
+            **user.metadata,
+            "transcribable_time" : 1800,
+            "last_updated" : now.isoformat()
+
+        }
+        metadata = self.__to_json(metadata)
 
         insert_query = """
             INSERT INTO users (

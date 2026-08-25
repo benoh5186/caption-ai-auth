@@ -71,13 +71,13 @@ def __get_user_metadata(user_db, user_id):
     refill_time = 3000
     user = user_db.get_user_by_id(user_id)
     transcribe_info = user.get("transcribe_info")
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     elapsed = now - transcribe_info.get("last_updated")
     if elapsed >= timedelta(days=1):
         updated_metadata = {
              "transcribe_info" : {
                         "transcribable_time" : refill_time,
-                        "last_updated" : now }
+                        "last_updated" : now.isoformat() }
         }
         user_db.update_user_profile(user_id=user_id, metadata=updated_metadata) 
         return updated_metadata.get("transcribe_info")
@@ -93,7 +93,7 @@ def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
         "$set" : {
             "error" : reason,
             "completed" : False,
-            "finished_at" : datetime.datetime.utcnow()
+            "finished_at" : datetime.utcnow()
         }
     }
     )
