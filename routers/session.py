@@ -65,6 +65,21 @@ class SessionRouter:
             self.upload_video,
             methods=["POST"]
         )
+        self.__router.add_api_route(
+            "/upload-video-v2/{session_id}",
+            self.upload_video_v2,
+            methods=["POST"]
+        )
+        self.__router.add_api_route(
+            "save-video-metadata/{session_id}",
+            self.save_video_metadata,
+            methods=["POST"]
+        )
+        self.__router.add_api_route(
+            "job-status/{session_id}/{job_id}",
+            self.job_status,
+            methods=["GET"]
+        )
 
     async def load_sessions(self, request: Request):
         session_payload = self.__auth_utility.require_session(request)

@@ -22,7 +22,7 @@ from db.db import Database
 
 
 class TranscribeRouter:
-    def __init__(self, mongo_db: AsyncIOMotorClient, user_db: Database, auth_utility: AuthUtility) -> None:
+    def __init__(self, mongo_db: AsyncIOMotorClient, auth_utility: AuthUtility) -> None:
         self.__router = APIRouter(prefix="/api/v1/transcribe", tags=["transcribe"])
         self.__bucket_name = os.getenv("S3_BUCKET")
         self.__burned_bucket_name = os.getenv("S3_BURNED_VIDEO")
@@ -30,7 +30,6 @@ class TranscribeRouter:
         self.__register_routes()
         self.__user_session_metadata = mongo_db["user_session_metadata"]
         self.__job_info_metadata = mongo_db["background_jobs_collection"]
-        self.__user_db = user_db
         self.__auth_utility = auth_utility
 
     def __register_routes(self) -> None:
@@ -43,11 +42,6 @@ class TranscribeRouter:
             "/export/{session_id}",
             self.export,
             methods=["POST"]
-        )
-        self.__router.add_api_route(
-            "/export-status/{job_id}/{session_id}",
-            self.export_status,
-            methods=["GET"]
         )
         self.__router.add_api_route(
             "/download/{job_id}",
