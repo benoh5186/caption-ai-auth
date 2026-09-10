@@ -19,7 +19,9 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
             "user_id" : user_id,
             "session_id" : session_id
         })
+        print("starting vid time job!!")
         if session_mongodb is None:
+            print("yea mongodb not available")
             __set_job_failed("session does not exist for this job", mongo_jobs_coll, job_id, user_id)
             return 
         s3_key = session_mongodb.get("s3_key")
@@ -43,6 +45,7 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                 check=True
             )
             thumbnail_s3_key = __create_vid_thumbnail(session_id, temp_vid.name, s3_client, bucket_name)
+            print("done!!")
             mongo_session_coll.update_one(
                 {
                     "user_id" : user_id,
@@ -56,6 +59,7 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                 })
 
     except Exception as exc:
+        print(f"okie failed: {str(exc)}")
         __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id)
 
 def __create_vid_thumbnail(session_id, video_path, s3_client, bucket_name, timestamp: str = "00:00:01"):

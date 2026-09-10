@@ -71,12 +71,12 @@ class SessionRouter:
             methods=["POST"]
         )
         self.__router.add_api_route(
-            "save-video-metadata/{session_id}",
+            "/save-video-metadata/{session_id}",
             self.save_video_metadata,
             methods=["POST"]
         )
         self.__router.add_api_route(
-            "job-status/{session_id}/{job_id}",
+            "/job-status/{session_id}/{job_id}",
             self.job_status,
             methods=["GET"]
         )
@@ -114,8 +114,9 @@ class SessionRouter:
     async def upload_video_v2(self, request: Request, session_id: str):
         session_payload = self.__auth_utility.require_session(request)
         body = await request.json()
-        content_type = body.get("content_type")
-        if not content_type or content_type.startswith("video/"):
+        content_type = body.get("ContentType")
+        print(f"content type is {content_type}")
+        if not content_type or not content_type.startswith("video/"):
             raise HTTPException(status_code=415, detail="expected video/* content type.")
         if not self.__bucket_name:
             raise HTTPException(status_code=500, detail="S3_BUCKET is not configured.")
@@ -161,7 +162,7 @@ class SessionRouter:
 
     async def save_video_metadata(self, request: Request, session_id: str):
         session_payload = self.__auth_utility.require_session(request)
-        user_id = session_payload.get("user_id")
+        user_id = session_payload.get("sub")
         job_id = str(uuid.uuid4())
         try:
             enqueue_vid_time_job(
