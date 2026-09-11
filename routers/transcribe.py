@@ -126,11 +126,12 @@ class TranscribeRouter:
             })
             raise HTTPException(status_code=503, detail="redis queue is unavailable")
 
-        except Exception:
+        except Exception as exc:
             await self.__job_info_metadata.delete_one({
                 "job_id": job_id,
                 "user_id": user_id,
             })
+            print(f"issue is: {str(exc)}")
             raise HTTPException(status_code=500, detail="failed to enqueue render job.")
         return {"job_id" : job_id}
 

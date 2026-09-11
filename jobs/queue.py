@@ -45,15 +45,14 @@ def enqueue_render_job(job_id: str, session_id: str, user_id: str, bucket_name: 
         }
     )
 
-def enqueue_transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str, transcribe_min: int):
+def enqueue_transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str):
     redis_queue.enqueue(
         transcribe_job,
         kwargs={
             "job_id" : job_id,
             "session_id" : session_id,
             "user_id" : user_id,
-            "bucket_name" : bucket_name,
-            "transcribe_min_left" : transcribe_min
+            "bucket_name" : bucket_name
         }
     )
 

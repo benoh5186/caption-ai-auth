@@ -78,7 +78,7 @@ class SessionRouter:
             methods=["POST"]
         )
         self.__router.add_api_route(
-            "/job-status/{session_id}/{job_id}",
+            "/job-status/{job_id}/{session_id}",
             self.job_status,
             methods=["GET"]
         )
@@ -219,7 +219,7 @@ class SessionRouter:
             raise HTTPException(status_code=500, detail="failed to enqueue render job.")
         return {"job_id" : vid_time_job_id}
 
-    async def job_status(self, request: Request, session_id: str, job_id: str):
+    async def job_status(self, request: Request, job_id: str, session_id: str):
         session_payload = self.__auth_utility.require_session(request)
         job = await self.__job_info_metadata.find_one(
             {"job_id" : job_id,
@@ -230,7 +230,7 @@ class SessionRouter:
             print("not found")
             await self.__user_session_metadata.update_one(
                 {"user_id" : session_payload.get("sub"), "session_id" : session_id},
-                {"$set", {"job_id" : None}}
+                {"$set": {"job_id" : None}}
             )
             raise HTTPException(status_code=404)
         status = job["completed"]
