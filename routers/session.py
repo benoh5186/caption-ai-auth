@@ -21,6 +21,7 @@ class SessionRouter:
         self.__user = user_sessions
         self.__auth_utility = auth_utility
         self.__user_session_metadata = mongo_db["user_session_metadata"]
+        self.__job_info_metadata = mongo_db["background_jobs_collection"]
         self.__bucket_name = os.getenv("S3_BUCKET")
         self.__s3_client = boto3.client(
             "s3",
