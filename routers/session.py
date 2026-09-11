@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 from jobs.queue import enqueue_vid_time_job, enqueue_thumbnail_job
 from redis import RedisError 
+import datetime
 
 
 class SessionRouter:
@@ -165,6 +166,22 @@ class SessionRouter:
         user_id = session_payload.get("sub")
         vid_time_job_id = str(uuid.uuid4())
         thumbnail_job_id = str(uuid.uuid4())
+
+        await self.__job_info_metadata.insert_one({
+                "job_id" : vid_time_job_id,
+                "user_id" : user_id,
+                "created_at" : datetime.datetime.utcnow(),
+                "completed" : None,
+                "error" : None 
+            })
+        await self.__job_info_metadata.insert_one({
+                "job_id" : thumbnail_job_id,
+                "user_id" : user_id,
+                "created_at" : datetime.datetime.utcnow(),
+                "completed" : None,
+                "error" : None 
+                }
+            )
         try:
             enqueue_vid_time_job(
                 job_id=vid_time_job_id,
