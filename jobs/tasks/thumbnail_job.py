@@ -5,10 +5,9 @@ import tempfile
 import subprocess
 import os 
 
-
-def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str):
+def thumbnail_job(job_id, session_id, user_id, bucket_name, timestamp: str = "00:00:01"):
     mongo_db = None 
-    mongo_jobs_coll = None
+    mongo_jobs_coll = None 
     try:
         mongo_client: MongoClient = ClientUtility.get_mongo_client()
         mongo_db = mongo_client["caption_ai"]
@@ -32,34 +31,56 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                 "Key": s3_key 
             },
             ExpiresIn=900
-        )
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                video_url,
-            ],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        ) 
+        thumbnail_s3_key = f"thumbnails/{session_id}.jpg"
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as thumb_file:
+            thumbnail_path = thumb_file.name
+        subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-ss",
+                        timestamp,
+                        "-i",
+                        video_url,
+                        "-frames:v",
+                        "1",
+                        "-vf",
+                        "scale=320:-1",
+                        thumbnail_path,
+                        "-y",
+                    ],
+                    check=True,
+                    text=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE
+                )
+        with open(thumbnail_path, "rb") as file:
+            thumbnail_bytes = file.read()
+            s3_client.put_object(
+                Bucket=bucket_name,  
+                Key=thumbnail_s3_key,
+                Body=thumbnail_bytes,
+                ContentType="image/jpeg",
+            )
+
         mongo_session_coll.update_one(
             {
                 "user_id" : user_id,
                 "session_id" : session_id
             }, {
                 "$set" : {
-                    "vid_time" : float(result.stdout.strip()),
-                    "upload_status" : "complete"
-                }      
-            })
-
+                    "thumbnail_s3_key" : thumbnail_s3_key
+                }    
+                }
+        )
+        
     except Exception as exc:
-        print(f"okie failed: {str(exc)}")
-        __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id)
-
+         print(f"okie failed: {str(exc)}")
+         __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id) 
+    
+    finally:
+        if os.path.exists(thumbnail_path):
+            os.remove(thumbnail_path)
 
 def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
     mongo_jobs_coll.update_one({

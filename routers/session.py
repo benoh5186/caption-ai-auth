@@ -10,7 +10,7 @@ from urllib.parse import quote
 import uuid
 import subprocess
 import tempfile
-from jobs.queue import enqueue_vid_time_job
+from jobs.queue import enqueue_vid_time_job, enqueue_thumbnail_job
 from redis import RedisError 
 
 
@@ -163,28 +163,43 @@ class SessionRouter:
     async def save_video_metadata(self, request: Request, session_id: str):
         session_payload = self.__auth_utility.require_session(request)
         user_id = session_payload.get("sub")
-        job_id = str(uuid.uuid4())
+        vid_time_job_id = str(uuid.uuid4())
+        thumbnail_job_id = str(uuid.uuid4())
         try:
             enqueue_vid_time_job(
-                        job_id=job_id,
-                        session_id=session_id,
-                        user_id=user_id,
-                        bucket_name=self.__bucket_name
-                    )
+                job_id=vid_time_job_id,
+                session_id=session_id,
+                user_id=user_id,
+                bucket_name=self.__bucket_name
+            )
+            enqueue_thumbnail_job(
+                job_id=thumbnail_job_id,
+                session_id=session_id,
+                user_id=user_id,
+                bucket_name=self.__bucket_name
+            )
         except RedisError:
             await self.__job_info_metadata.delete_one({
-                "job_id": job_id,
+                "job_id": vid_time_job_id,
+                "user_id": user_id,
+            })
+            await self.__job_info_metadata.delete_one({
+                "job_id": thumbnail_job_id,
                 "user_id": user_id,
             })
             raise HTTPException(status_code=503, detail="redis queue is unavailable")
 
         except Exception:
             await self.__job_info_metadata.delete_one({
-                "job_id": job_id,
+                "job_id": vid_time_job_id,
+                "user_id": user_id,
+            })
+            await self.__job_info_metadata.delete_one({
+                "job_id": thumbnail_job_id,
                 "user_id": user_id,
             })
             raise HTTPException(status_code=500, detail="failed to enqueue render job.")
-        return {"job_id" : job_id}
+        return {"job_id" : vid_time_job_id}
 
     async def job_status(self, request: Request, session_id: str, job_id: str):
         session_payload = self.__auth_utility.require_session(request)

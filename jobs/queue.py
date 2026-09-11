@@ -5,10 +5,22 @@ from jobs.tasks.render import render_video_job, render_vid_job
 from jobs.tasks.cleanup import clean_up_expired_jobs
 from jobs.tasks.transcribe import transcribe_job
 from jobs.tasks.video_time import video_time_job
+from jobs.tasks.thumbnail_job import thumbnail_job
 from jobs.redis_conn import redis_conn
 
 
 redis_queue = Queue('default', connection=redis_conn)
+
+def enqueue_thumbnail_job(job_id: str, session_id: str, user_id: str, bucket_name: str):
+    redis_queue.enqueue(
+        thumbnail_job,
+        kwargs={
+            "job_id" : job_id,
+            "session_id" : session_id,
+            "user_id" : user_id,
+            "bucket_name" : bucket_name
+        }
+    )
 
 def enqueue_vid_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str):
     redis_queue.enqueue(
