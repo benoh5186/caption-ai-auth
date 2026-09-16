@@ -1,7 +1,6 @@
 from services.client_connector import ClientUtility
 from pymongo import MongoClient
-import datetime
-import tempfile 
+from datetime import datetime
 import subprocess
 import os 
 
@@ -55,6 +54,15 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                     "upload_status" : "complete"
                 }      
             })
+        mongo_jobs_coll.update_one({
+                    "user_id" : user_id,
+                    "job_id" : job_id 
+                }, { 
+                    "$set" : {
+                        "completed" : True,
+                        "finished_at" : datetime.utcnow()
+                    }
+                })
 
     except Exception as exc:
         print(f"okie failed: {str(exc)}")
@@ -70,7 +78,7 @@ def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
         "$set" : {
             "error" : reason,
             "completed" : False,
-            "finished_at" : datetime.datetime.utcnow()
+            "finished_at" : datetime.utcnow()
         }
     }
     )

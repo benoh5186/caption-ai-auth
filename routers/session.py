@@ -234,6 +234,7 @@ class SessionRouter:
             )
             raise HTTPException(status_code=404)
         status = job["completed"]
+        print(f"the job status is: {status}")
         if status is not None:
             return  {
                 "completed" : status,

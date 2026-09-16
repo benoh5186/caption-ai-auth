@@ -50,7 +50,7 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                         "last_updated" : transcribe_info.get("last_updated")})
         mongo_jobs_coll.update_one({
             "user_id" : user_id,
-            "session_id" : session_id 
+            "job_id" : job_id 
         }, { 
             "$set" : {
                 "completed" : True,

@@ -4,6 +4,7 @@ import datetime
 import tempfile 
 import subprocess
 import os 
+from datetime import datetime
 
 def thumbnail_job(job_id, session_id, user_id, bucket_name, timestamp: str = "00:00:01"):
     mongo_db = None 
@@ -73,6 +74,15 @@ def thumbnail_job(job_id, session_id, user_id, bucket_name, timestamp: str = "00
                 }    
                 }
         )
+        mongo_jobs_coll.update_one({
+                    "user_id" : user_id,
+                    "job_id" : job_id 
+                }, { 
+                    "$set" : {
+                        "completed" : True,
+                        "finished_at" : datetime.utcnow()
+                    }
+         })
         
     except Exception as exc:
          print(f"okie failed: {str(exc)}")
