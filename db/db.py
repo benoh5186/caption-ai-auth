@@ -90,7 +90,6 @@ class Database:
             **user.metadata,
             "transcribable_time" : 1800,
             "last_updated" : now.isoformat()
-
         }
         metadata = self.__to_json(metadata)
 

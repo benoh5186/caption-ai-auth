@@ -43,18 +43,18 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
                 "transcript" : transcript
             }
         })
+        print("\n\nokie time to update transcribable time!\n\n")
         updated_transcribable_time = transcribable_time - vid_time
-        user_db.update_user_profile(user_id=user_id, metadata={"transcribe_info" : {
+        user_db.update_user_profile(user_id=user_id, metadata={
                         "transcribable_time" : updated_transcribable_time,
-                        "last_updated" : transcribe_info.get("last_updated")
-                    }})
+                        "last_updated" : transcribe_info.get("last_updated")})
         mongo_jobs_coll.update_one({
             "user_id" : user_id,
             "session_id" : session_id 
         }, { 
             "$set" : {
                 "completed" : True,
-                "finished_at" : datetime.datetime.utcnow()
+                "finished_at" : datetime.utcnow()
             }
         })
 
@@ -68,19 +68,22 @@ def transcribe_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
             print("render job failed before the job collection was available")  
 
 def __get_user_metadata(user_db, user_id):
-    refill_time = 3000
+    refill_time = 1800
     user = user_db.get_user_by_id(user_id)
-    transcribe_info = user.get("transcribe_info")
+    user_data = user.model_dump()
+    print(f"user:{user_data} \n user type: {type(user)}")
+    transcribe_info = user_data.get("metadata")
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    elapsed = now - transcribe_info.get("last_updated")
+    print(f"user data: {transcribe_info}\ntype of last updated: {transcribe_info.get('last_updated')}\n")
+    last_updated = datetime.fromisoformat(transcribe_info.get("last_updated"))
+    elapsed = now - last_updated
     if elapsed >= timedelta(days=1):
+        print("Day has passed for daily transcription time!")
         updated_metadata = {
-             "transcribe_info" : {
                         "transcribable_time" : refill_time,
                         "last_updated" : now.isoformat() }
-        }
         user_db.update_user_profile(user_id=user_id, metadata=updated_metadata) 
-        return updated_metadata.get("transcribe_info")
+        return updated_metadata
     return transcribe_info
 
 
