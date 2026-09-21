@@ -6,6 +6,7 @@ import os
 
 
 def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str):
+    # vid time job must first check if given video is within disk space of given hosted hardware
     mongo_db = None 
     mongo_jobs_coll = None
     try:
@@ -67,6 +68,10 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
     except Exception as exc:
         print(f"okie failed: {str(exc)}")
         __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id)
+        s3_client.delete_object(
+            Bucket=bucket_name,
+            Key=s3_key
+        )
 
 
 def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):

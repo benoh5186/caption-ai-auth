@@ -32,6 +32,8 @@ def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str,
         if s3_key is None or transcript is None or style_data is None:
             __set_job_failed("missing data to render caption", mongo_jobs_coll, job_id, user_id)
             return
+
+        # This must be replaced with tempfile for more consistent results as presigned url will lead to timeout with bigger file(s)
         video_url = s3_client.generate_presigned_url(
             ClientMethod="get_object",
             Params={'Bucket' : bucket_name, 'Key' : s3_key},

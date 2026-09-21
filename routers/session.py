@@ -163,6 +163,7 @@ class SessionRouter:
         }  
 
     async def save_video_metadata(self, request: Request, session_id: str):
+        # vid time job must first check if given video is within disk space of given hosted hardware
         session_payload = self.__auth_utility.require_session(request)
         user_id = session_payload.get("sub")
         vid_time_job_id = str(uuid.uuid4())
