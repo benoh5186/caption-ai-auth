@@ -25,6 +25,7 @@ def video_time_job(job_id: str, session_id: str, user_id: str, bucket_name: str)
             __set_job_failed("session does not exist for this job", mongo_jobs_coll, job_id, user_id)
             return 
         s3_key = session_mongodb.get("s3_key")
+        __check_vid_size(s3_client=s3_client, bucket=bucket_name, s3_key=s3_key)
         video_url = s3_client.generate_presigned_url(
             ClientMethod="get_object",
             Params={
@@ -87,3 +88,13 @@ def __set_job_failed(reason: str, mongo_jobs_coll, job_id: str, user_id: str):
         }
     }
     )
+
+def __check_vid_size(s3_client, bucket, s3_key):
+    allowed_size = 250 * 1024 * 1024
+    object_metadata = s3_client.head_object(
+        Bucket=bucket,
+        Key=s3_key 
+    )
+    content_length = object_metadata["ContentLength"]
+    if content_length > allowed_size:
+        raise ValueError("Video file is too large.")
