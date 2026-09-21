@@ -9,7 +9,6 @@ import datetime
 import subprocess
 import json 
 
-
 def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str, burned_video_bucket: str):
     mongo_db = None 
     mongo_jobs_coll = None
@@ -34,15 +33,20 @@ def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str,
             return
 
         # This must be replaced with tempfile for more consistent results as presigned url will lead to timeout with bigger file(s)
-        video_url = s3_client.generate_presigned_url(
-            ClientMethod="get_object",
-            Params={'Bucket' : bucket_name, 'Key' : s3_key},
-            ExpiresIn=3600
-        )
+        input_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        input_path = input_file.name
+        input_file.close()
+        s3_client.download_file(
+                        Bucket=bucket_name,
+                        Key=s3_key,
+                        Filename=input_path 
+                    )
+        
+
         with tempfile.NamedTemporaryFile(delete=True, suffix=".mp4") as output_path:
             render_request = {
                                 "inputProps": 
-                                    {"transcript": transcript, "segmentStyles": style_data, "videoSrc": video_url},
+                                    {"transcript": transcript, "segmentStyles": style_data, "videoSrc": input_path},
                                 "outputLocation":
                                     output_path.name
                                 }
@@ -79,6 +83,9 @@ def render_vid_job(job_id: str, session_id: str, user_id: str, bucket_name: str,
             __set_job_failed(str(exc), mongo_jobs_coll, job_id, user_id)
         else:
             print("render job failed before the job collection was available") 
+    finally:
+        if input_path and os.path.exists(input_path):
+            os.remove(input_path)
     
 
 

@@ -1,10 +1,10 @@
-import {Input, ALL_FORMATS, UrlSource} from "mediabunny"
+import {Input, ALL_FORMATS, FilePathSource} from "mediabunny"
 
 
 export const getMediaMetadata = async (src: string) => {
     const input = new Input({
         formats: ALL_FORMATS,
-        source: new UrlSource(src)
+        source: new FilePathSource(src)
     })
 
     const durationInSeconds = await input.computeDuration();
@@ -15,6 +15,8 @@ export const getMediaMetadata = async (src: string) => {
 
     const displayWidth = await videoTrack.getDisplayWidth();
     const displayHeight = await videoTrack.getDisplayHeight();
+
+    await input.dispose();
 
     return {
         durationInSeconds,
